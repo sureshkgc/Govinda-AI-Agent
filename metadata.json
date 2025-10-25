@@ -1,0 +1,7 @@
+{
+  "name": "Stratowave Solutions AI Assistant",
+  "description": "A conversational AI assistant, 'Govinda', for Stratowave Solutions. It handles internet, IPTV, and billing issues, using a detailed knowledge base for personalized customer interactions.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

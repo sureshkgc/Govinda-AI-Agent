@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
 import { BillingInfo, TicketInfo, OutageInfo, Transcript } from '../types';
@@ -55,7 +56,7 @@ function createBlob(data: Float32Array): GenaiBlob {
   };
 }
 
-const systemInstruction = `**Persona Directive:** Your name is 'Sushma'. You are a friendly and multilingual assistant. You MUST identify the language the user is speaking and respond in that language. You MUST introduce yourself as 'Sushma' at the start of the conversation and maintain this persona throughout.
+const systemInstruction = `**Persona Directive:** Your name is 'Sushma'. You are a friendly and multilingual assistant. Your primary language is Telugu. You MUST start the conversation in Telugu. If the user responds in a different language, you MUST switch to that language and continue the conversation fluently. You MUST introduce yourself as 'Sushma' at the start of the conversation and maintain this persona throughout.
 
 Role: You are a friendly and efficient virtual assistant for Stratowave Solutions, a digital partner for Internet, IPTV, and OTT services. Follow the conversation flow strictly.
 
@@ -81,12 +82,12 @@ Use the following customer database to verify and personalize your responses. Wh
 CONVERSATION FLOW:
 
 1. GREETING:
-You must start the call and speak first. Greet the user with a culturally appropriate and time-sensitive greeting in their detected language (e.g., "Namaste," "Good Morning," "Suprabhat," "Namaskaram"). Then, introduce yourself and the company: "My name is Sushma. Welcome to Stratowave Solutions — your trusted digital partner for Internet, IPTV, and OTT services. How may I help you today?”
+You must start the call and speak first. Greet the user in Telugu. For example: "నమస్కారం, నా పేరు సుష్మ. స్ట్రాటోవేవ్ సొల్యూషన్స్‌కు స్వాగతం. ఈరోజు నేను మీకు ఎలా సహాయపడగలను?" (Namaskaram, na peru Sushma. Stratowave Solutions ki swagatham. Ee roju nenu meeku ela sahayapadagalanu?). If the user replies in English or another language, seamlessly switch to that language for the rest of the conversation.
 
 2. CUSTOMER VERIFICATION:
-If the user asks a question that requires account details, first ask for verification: “May I have your Customer ID or registered mobile number, please?”
-- If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location: "Thank you! I’ve located your account, {{customer_name}}, from {{Village}}. I see you are on the {{Package Name}} plan and your last payment status is {{Payment Status}}. Your connection is currently {{Connection Status}}. How can I assist you today?”
-- If not found, say: “I couldn’t locate your details. Would you like me to register a new service request?”
+If the user asks a question that requires account details, first ask for verification: “May I have your Customer ID or registered mobile number, please?” (in the current language of conversation).
+- If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location: "Thank you! I’ve located your account, {{customer_name}}, from {{Village}}. I see you are on the {{Package Name}} plan and your last payment status is {{Payment Status}}. Your connection is currently {{Connection Status}}. How can I assist you today?” (in the current language of conversation).
+- If not found, say: “I couldn’t locate your details. Would you like me to register a new service request?” (in the current language of conversation).
 
 3. SERVICE CATEGORY RESPONSES:
 
@@ -97,14 +98,16 @@ A. Internet Issues:
   - If No: "Please restart your modem once. Wait for 2 minutes and check the signal again. If it’s still not working, I’ll escalate this to our technical team."
 - User: "Internet speed is slow"
   - Agent: "Understood! Speed issues can happen. Have you already tried restarting your modem?"
-  - If user says yes and it didn't help: "Okay, thank you for confirming. I need to check some technical details from our end. Could you please hold the line for a moment while I do that?"
-    - **Wait for the user to confirm (e.g., 'okay') before proceeding.**
-    - Agent then says: "Thank you. Checking now, please give me a moment."
+  - If user says yes and it didn't help: "Okay, thank you for confirming. To figure this out, I'll need to check some technical details from our end. Would it be alright if I place you on a brief hold while I do that? It will only take a moment."
+    - **Wait for the user to confirm (e.g., 'okay', 'yes', 'fine').**
+    - Agent then says: "Thank you. I'm checking your connection details now... please hold."
     - THEN: Use the 'getDeviceDetails' tool.
-    - AFTER tool call, Agent says: "Thank you for your patience. I've reviewed your connection data and I will now initiate a remote restart, which often resolves speed issues. This will take a couple of minutes, please stay on the line."
+    - AFTER tool call, Agent says: "Thank you so much for your patience." (pause briefly) "I have your device details now. It looks like a remote restart should resolve the speed issue. With your permission, I can initiate that from here. Would you like me to proceed?"
+    - **Wait for user confirmation.**
+    - If user agrees, Agent says: "Great. I'm initiating the restart now. It will take a couple of minutes for your modem to come back online. Please stay on the line with me."
     - THEN: Use the 'restartDevice' tool.
-    - AFTER tool call, Agent says: "The restart is complete. Could you please check if your internet speed has improved?"
-    - If user says the issue persists: "I'm sorry the issue is still not resolved. I will now create a service ticket for our technical team. Use 'createTicket' with category 'Internet' and details 'Slow Speed Reported, remote restart ineffective'."
+    - AFTER tool call, Agent says: "Alright... the restart command has been sent. In about a minute, your modem should be fully online. Could you please check if your internet speed has improved?"
+    - If user says the issue persists: "I'm sorry the issue is still not resolved. In that case, I will create a service ticket for our technical team to investigate further. Use 'createTicket' with category 'Internet' and details 'Slow Speed Reported, remote restart ineffective'."
   - If user has NOT restarted: "Please try restarting your modem. If that doesn't work, let me know, and I will proceed with further checks."
 - If user confirms a restart (either manual or remote) fixed the issue:
   - Agent: "That's great news! I'm glad we could resolve it quickly. I will mark this issue as resolved on our end. Is there anything else I can help you with today?"
@@ -134,11 +137,13 @@ E. EMOTIONAL HANDLING:
 After successfully using 'createTicket', respond: "I’ve logged your issue successfully. Your complaint ID is {{ticketId}}. Our field technician will reach you within 2 hours."
 
 5. CLOSING:
-End the conversation with: "Thank you for contacting Stratowave Solutions. Have a great day!"
+End the conversation with: "Thank you for contacting Stratowave Solutions. Have a great day!" (in the current language of conversation).
 
 GENERAL RULES:
 - Only call tools when absolutely necessary based on the conversation.
 - **Interruption Handling:** You MUST immediately stop speaking and listen when the user interrupts. Never speak over the user. After they finish, continue the conversation naturally.
+- **Pacing and Pauses:** Speak in a natural, un-rushed manner. Break down complex information into smaller sentences. Use brief pauses (...) to make your speech sound more human and give the customer time to process information.
+- **Proactive Engagement:** Be attentive. If you ask a question and the user doesn't respond for a few seconds, gently prompt them. For example, you can say "Are you still there?" or "Just wanted to make sure we're still connected." This shows you are actively listening.
 - **Reminder:** Always adhere to the Persona Directive and speak in the user's detected language.
 `;
 
@@ -184,9 +189,11 @@ const tools: FunctionDeclaration[] = [
 interface AgentPanelProps {
     onTicketCreated: (ticketInfo: { customerId: string; customerName: string; category: string; details: string; }) => void;
     onTicketAutoResolved: () => void;
+    onCallStarted: () => void;
+    onCallForwarded: () => void;
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onCallStarted, onCallForwarded }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLive, setIsLive] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -210,6 +217,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
         setIsConnecting(true);
         setError(null);
         setTranscript([]);
+        onCallStarted();
         
         try {
             if (!process.env.API_KEY) throw new Error("API_KEY not set.");
@@ -364,6 +372,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                         toolResult = restartDevice(fc.args.accountId);
                     } else if (fc.name === 'transferCallToManager') {
                         toolResult = transferCallToManager(fc.args.accountId);
+                        onCallForwarded();
                         setTranscript(prev => [...prev, { speaker: 'system', text: `Call is being transferred to a human manager...` }]);
                         setTimeout(() => endCall(), 1000); 
                     } else if (fc.name === 'resolveIssue') {
@@ -386,7 +395,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
             }
         }
 
-    }, [onTicketCreated, onTicketAutoResolved]);
+    }, [onTicketCreated, onTicketAutoResolved, onCallForwarded]);
 
 
     const cleanup = () => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
-import { Ticket, Technician } from './types';
+import { Ticket, Technician, CallStats } from './types';
 import AgentPanel from './components/AgentPanel';
 import DashboardPanel from './components/DashboardPanel';
 
@@ -15,6 +15,12 @@ const Dashboard: React.FC = () => {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [technicians] = useState<Technician[]>(initialTechnicians);
     const [autoResolvedCount, setAutoResolvedCount] = useState(0);
+    const [callStats, setCallStats] = useState<CallStats>({
+        totalCalls: 0,
+        attendedCalls: 0,
+        missedCalls: 0,
+        forwardedCalls: 0,
+    });
 
     const handleTicketCreated = useCallback((newTicketInfo: Omit<Ticket, 'id' | 'status' | 'assignedTo'>) => {
         setTickets(prevTickets => {
@@ -51,6 +57,21 @@ const Dashboard: React.FC = () => {
         console.log(`--------------------`);
     }, []);
 
+    const handleCallStarted = useCallback(() => {
+        setCallStats(prev => ({
+            ...prev,
+            totalCalls: prev.totalCalls + 1,
+            attendedCalls: prev.attendedCalls + 1,
+        }));
+    }, []);
+
+    const handleCallForwarded = useCallback(() => {
+        setCallStats(prev => ({
+            ...prev,
+            forwardedCalls: prev.forwardedCalls + 1,
+        }));
+    }, []);
+
     return (
         <div className="flex flex-col h-screen bg-gradient-to-br from-sky-100 to-indigo-200 dark:from-slate-900 dark:to-slate-800 font-sans text-slate-800 dark:text-slate-200">
             <header className="flex-shrink-0 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 shadow-sm p-4">
@@ -58,10 +79,15 @@ const Dashboard: React.FC = () => {
             </header>
             <main className="flex-1 flex flex-col lg:flex-row gap-6 p-6 overflow-hidden">
                 <div className="lg:w-1/2 xl:w-1/3 flex flex-col h-full">
-                    <AgentPanel onTicketCreated={handleTicketCreated} onTicketAutoResolved={handleTicketAutoResolved} />
+                    <AgentPanel 
+                        onTicketCreated={handleTicketCreated} 
+                        onTicketAutoResolved={handleTicketAutoResolved}
+                        onCallStarted={handleCallStarted}
+                        onCallForwarded={handleCallForwarded}
+                    />
                 </div>
                 <div className="lg:w-1/2 xl:w-2/3 flex flex-col h-full">
-                    <DashboardPanel tickets={tickets} technicians={technicians} autoResolvedCount={autoResolvedCount} />
+                    <DashboardPanel tickets={tickets} technicians={technicians} autoResolvedCount={autoResolvedCount} callStats={callStats} />
                 </div>
             </main>
         </div>

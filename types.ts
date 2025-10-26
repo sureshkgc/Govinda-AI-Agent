@@ -39,3 +39,10 @@ export interface Transcript {
   speaker: 'user' | 'model' | 'system';
   text: string;
 }
+
+export interface CallStats {
+  totalCalls: number;
+  attendedCalls: number;
+  missedCalls: number;
+  forwardedCalls: number;
+}

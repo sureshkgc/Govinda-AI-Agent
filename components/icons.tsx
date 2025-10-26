@@ -116,3 +116,51 @@ export const SparklesIcon: React.FC<{ className?: string }> = ({ className }) =>
         <path d="M11.377 2.62c.494-.694.398-1.68-.227-2.222a.75.75 0 00-1.03-.227c-1.393.93-2.392 2.38-2.73 3.962.083.02.168.04.253.063a4.5 4.5 0 014.162-2.23.75.75 0 00.573-.744z" />
     </svg>
 );
+
+export const PhoneIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 24 24" 
+        fill="currentColor" 
+        className={className}
+    >
+        <path fillRule="evenodd" d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.292-.088.442A15 15 0 0018 15.057c.15.076.342.047.442-.088l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C6.55 22.5 1.5 17.45 1.5 9.75V7.5a3 3 0 013-3V4.5z" clipRule="evenodd" />
+    </svg>
+);
+
+export const PhoneArrowDownLeftIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 24 24" 
+        fill="currentColor" 
+        className={className}
+    >
+        <path fillRule="evenodd" d="M10.5 3.75a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0V5.56l-3.22 3.22a.75.75 0 11-1.06-1.06l3.22-3.22H3.75a.75.75 0 010-1.5h6.75z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.292-.088.442A15 15 0 0018 15.057c.15.076.342.047.442-.088l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C6.55 22.5 1.5 17.45 1.5 9.75V7.5a3 3 0 013-3V4.5z" clipRule="evenodd" />
+    </svg>
+);
+
+export const PhoneXMarkIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 24 24" 
+        fill="currentColor" 
+        className={className}
+    >
+        <path fillRule="evenodd" d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.292-.088.442A15 15 0 0018 15.057c.15.076.342.047.442-.088l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C6.55 22.5 1.5 17.45 1.5 9.75V7.5a3 3 0 013-3V4.5z" clipRule="evenodd" />
+        <path d="M10.233 1.342a.75.75 0 01.766.015l5.25 3.5a.75.75 0 01-.802 1.28l-5.25-3.5a.75.75 0 01.036-1.295z" />
+        <path d="M15.75 11.25a.75.75 0 01.75.75v5.25a.75.75 0 01-1.5 0v-5.25a.75.75 0 01.75-.75z" />
+        <path d="M11.609 15.19L.81 4.392a.75.75 0 011.06-1.061l10.799 10.798a.75.75 0 01-1.06 1.06z" />
+    </svg>
+);
+
+export const QuestionMarkCircleIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 24 24" 
+        fill="currentColor" 
+        className={className}
+    >
+        <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm8.25-1.5a.75.75 0 01.75.75v.75H12a.75.75 0 010 1.5H9.75v.75a.75.75 0 01-1.5 0v-1.5A.75.75 0 019 9.75h1.5v-.75a.75.75 0 01.75-.75zm1.5 4.5a1.125 1.125 0 100 2.25 1.125 1.125 0 000-2.25z" clipRule="evenodd" />
+    </svg>
+);

@@ -1,11 +1,23 @@
+
 import React, { useMemo } from 'react';
-import { Ticket, Technician } from '../types';
-import { TicketIcon, UserIcon, CheckCircleIcon, ClockIcon, ClipboardDocumentListIcon, SparklesIcon } from './icons';
+import { Ticket, Technician, CallStats } from '../types';
+import { 
+    TicketIcon, 
+    UserIcon, 
+    CheckCircleIcon, 
+    ClockIcon, 
+    ClipboardDocumentListIcon, 
+    SparklesIcon,
+    PhoneIcon,
+    PhoneArrowDownLeftIcon,
+    PhoneXMarkIcon
+} from './icons';
 
 interface DashboardPanelProps {
     tickets: Ticket[];
     technicians: Technician[];
     autoResolvedCount: number;
+    callStats: CallStats;
 }
 
 // --- PIE CHART COMPONENT ---
@@ -17,9 +29,8 @@ interface PieChartProps {
 const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#f43f5e', '#22d3ee'];
     
-    // Fix: The type inference for the reduce accumulator can be tricky.
-    // By letting TypeScript infer from the initial value (0), we ensure 'total' is a number.
-    const total = useMemo(() => Object.values(data).reduce((acc, value) => acc + value, 0), [data]);
+    // FIX: Add explicit types to the reduce accumulator and value to prevent type inference issues.
+    const total = useMemo(() => Object.values(data).reduce((acc: number, value: number) => acc + value, 0), [data]);
 
     if (total === 0) {
         return (
@@ -35,7 +46,8 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     let cumulativePercent = 0;
     const slices = Object.entries(data).map(([key, value]) => {
         const percent = value / total;
-        const startAngle = cumulativePercent * 360;
+        // Fix: Explicitly cast `cumulativePercent` to a number to prevent type errors in the arithmetic operation.
+        const startAngle = Number(cumulativePercent) * 360;
         const endAngle = (cumulativePercent + percent) * 360;
         cumulativePercent += percent;
         return { key, value, percent, startAngle, endAngle };
@@ -87,7 +99,7 @@ interface KpiCardProps {
     title: string;
     value: number;
     icon: React.ReactNode;
-    color: 'blue' | 'green' | 'yellow' | 'purple';
+    color: 'blue' | 'green' | 'yellow' | 'purple' | 'red' | 'indigo';
 }
 const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color }) => {
     const colorClasses = {
@@ -95,6 +107,8 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color }) => {
         green: 'bg-green-100 dark:bg-green-900/50 text-green-500',
         yellow: 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-500',
         purple: 'bg-purple-100 dark:bg-purple-900/50 text-purple-500',
+        red: 'bg-red-100 dark:bg-red-900/50 text-red-500',
+        indigo: 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-500',
     }
     return (
         <div className="bg-white/80 dark:bg-slate-800/80 p-4 rounded-lg shadow-md flex items-center gap-4">
@@ -110,7 +124,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color }) => {
 };
 
 
-const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, autoResolvedCount }) => {
+const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, autoResolvedCount, callStats }) => {
     const getTechnicianName = (id?: string) => {
         if (!id) return 'Unassigned';
         return technicians.find(t => t.id === id)?.name || 'Unknown';
@@ -170,7 +184,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                 <h2 className="text-lg font-semibold">Support Ticket Dashboard</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {/* --- ANALYTICS SECTION --- */}
+                {/* --- ANALYTICS OVERVIEW SECTION --- */}
                 <div>
                      <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Analytics Overview</h3>
                      {/* KPIs */}
@@ -186,6 +200,17 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                         <PieChart title="Tickets by Status" data={analytics.byStatus} />
                         <PieChart title="Tickets by Technician" data={analytics.byTechnician} />
                      </div>
+                </div>
+
+                {/* --- CALL CENTER ANALYTICS SECTION --- */}
+                <div>
+                    <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Call Center Analytics</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <KpiCard title="Total Calls Received" value={callStats.totalCalls} icon={<PhoneIcon className="w-6 h-6" />} color="blue"/>
+                        <KpiCard title="Calls Attended" value={callStats.attendedCalls} icon={<PhoneArrowDownLeftIcon className="w-6 h-6" />} color="green" />
+                        <KpiCard title="Calls Missed" value={callStats.missedCalls} icon={<PhoneXMarkIcon className="w-6 h-6" />} color="red" />
+                        <KpiCard title="Calls Forwarded" value={callStats.forwardedCalls} icon={<UserIcon className="w-6 h-6" />} color="indigo"/>
+                    </div>
                 </div>
                 
                 {/* --- TICKETS TABLE SECTION --- */}

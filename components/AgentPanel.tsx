@@ -1,11 +1,11 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
-import { BillingInfo, TicketInfo, OutageInfo, Transcript } from '../types';
+import { BillingInfo, Ticket, Transcript } from '../types';
 import { BotIcon, MicrophoneIcon, PhoneSlashIcon } from './icons';
 import TranscriptEntry from './TranscriptEntry';
 
 // --- AUDIO UTILS ---
+// Fix: Replaced malformed encode function and added necessary audio utility functions.
 function encode(bytes: Uint8Array) {
   let binary = '';
   const len = bytes.byteLength;
@@ -109,9 +109,9 @@ A. Internet Issues:
     - AFTER tool call, Agent says: "Alright... the restart command has been sent. In about a minute, your modem should be fully online. Could you please check if your internet speed has improved?"
     - If user says the issue persists: "I'm sorry the issue is still not resolved. In that case, I will create a service ticket for our technical team to investigate further. Use 'createTicket' with category 'Internet' and details 'Slow Speed Reported, remote restart ineffective'."
   - If user has NOT restarted: "Please try restarting your modem. If that doesn't work, let me know, and I will proceed with further checks."
-- If user confirms a restart (either manual or remote) fixed the issue:
-  - Agent: "That's great news! I'm glad we could resolve it quickly. I will mark this issue as resolved on our end. Is there anything else I can help you with today?"
-  - THEN: Use the 'resolveIssue' tool with details 'Issue resolved after modem restart'.
+- If a user confirms, in any language, that a restart (either manual or remote) has fixed their issue:
+  - Agent: You MUST respond positively in the current language of conversation. For example: "That's great news! I'm glad we could resolve it quickly. I will mark this issue as resolved on our end. Is there anything else I can help you with today?"
+  - THEN: You MUST use the 'resolveIssue' tool with the 'details' parameter set to 'Issue resolved after modem restart'.
 
 B. IPTV Issues:
 - User: "TV not working"
@@ -141,6 +141,7 @@ End the conversation with: "Thank you for contacting Stratowave Solutions. Have 
 
 GENERAL RULES:
 - Only call tools when absolutely necessary based on the conversation.
+- **Crucial Rule on Issue Resolution:** Your primary goal is to resolve issues. If a customer confirms their problem is solved (e.g., internet is working after a restart), you MUST ALWAYS call the 'resolveIssue' tool. This is a non-negotiable step, regardless of the language spoken (Telugu, English, etc.). Failure to call this tool after a confirmed resolution is a critical failure of your function.
 - **Interruption Handling:** You MUST immediately stop speaking and listen when the user interrupts. Never speak over the user. After they finish, continue the conversation naturally.
 - **Pacing and Pauses:** Speak in a natural, un-rushed manner. Break down complex information into smaller sentences. Use brief pauses (...) to make your speech sound more human and give the customer time to process information.
 - **Proactive Engagement:** Be attentive. If you ask a question and the user doesn't respond for a few seconds, gently prompt them. For example, you can say "Are you still there?" or "Just wanted to make sure we're still connected." This shows you are actively listening.
@@ -151,9 +152,6 @@ GENERAL RULES:
 const getBilling = (accountId: string): BillingInfo => ({
     balance: 699.00, lastInvoiceAmount: 699.00, lastInvoiceDate: '2023-10-01',
     dueDate: '2023-10-28', planName: 'Fiber 100Mbps', pastDue: false,
-});
-const createTicket = (accountId: string, customerName: string, category: string, details: string): TicketInfo => ({
-    ticketId: `TCK-DUMMY`, priority: 'Normal', eta: '2 hours',
 });
 const sendSms = (accountId: string, message: string): { status: string } => {
     console.log(`SIMULATING SMS to account ${accountId}: "${message}"`);
@@ -187,7 +185,7 @@ const tools: FunctionDeclaration[] = [
 ];
 
 interface AgentPanelProps {
-    onTicketCreated: (ticketInfo: { customerId: string; customerName: string; category: string; details: string; }) => void;
+    onTicketCreated: (ticketInfo: Omit<Ticket, 'status' | 'assignedTo'>) => void;
     onTicketAutoResolved: () => void;
     onCallStarted: () => void;
     onCallForwarded: () => void;
@@ -357,8 +355,14 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                     if (fc.name === 'getBilling') {
                         toolResult = getBilling(fc.args.accountId);
                     } else if (fc.name === 'createTicket') {
-                        toolResult = createTicket(fc.args.accountId, fc.args.customerName, fc.args.category, fc.args.details);
+                        const ticketId = `TCK-${Math.floor(10000 + Math.random() * 90000)}`;
+                        toolResult = {
+                            ticketId: ticketId,
+                            priority: 'Normal',
+                            eta: '2 hours',
+                        };
                         onTicketCreated({
+                            id: ticketId,
                             customerId: fc.args.accountId,
                             customerName: fc.args.customerName,
                             category: fc.args.category,

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Ticket, Technician, CallStats } from './types';
 import AgentPanel from './components/AgentPanel';
@@ -22,7 +21,7 @@ const Dashboard: React.FC = () => {
         forwardedCalls: 0,
     });
 
-    const handleTicketCreated = useCallback((newTicketInfo: Omit<Ticket, 'id' | 'status' | 'assignedTo'>) => {
+    const handleTicketCreated = useCallback((newTicketInfo: Omit<Ticket, 'status' | 'assignedTo'>) => {
         setTickets(prevTickets => {
             const availableTechnicians = technicians.filter(t => 
                 t.skills.includes(newTicketInfo.category) || t.skills.includes(newTicketInfo.category.split(' ')[0])
@@ -33,7 +32,6 @@ const Dashboard: React.FC = () => {
 
             const newTicket: Ticket = {
                 ...newTicketInfo,
-                id: `TCK-${Math.floor(10000 + Math.random() * 90000)}`,
                 status: 'Assigned',
                 assignedTo: assignedTechnician.id,
             };

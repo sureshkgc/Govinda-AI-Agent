@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Ticket, Technician, CallStats } from '../types';
 import { 
@@ -29,14 +28,13 @@ interface PieChartProps {
 const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#f43f5e', '#22d3ee'];
     
-    // FIX: Add explicit types to the reduce accumulator and value to prevent type inference issues.
     const total = useMemo(() => Object.values(data).reduce((acc: number, value: number) => acc + value, 0), [data]);
 
     if (total === 0) {
         return (
-             <div className="bg-white/80 dark:bg-slate-800/80 p-4 rounded-lg shadow-md h-full flex flex-col">
+             <div className="bg-white/80 dark:bg-slate-800/80 p-3 rounded-lg shadow-md flex flex-col">
                 <h3 className="text-md font-semibold text-slate-700 dark:text-slate-300 mb-2">{title}</h3>
-                <div className="flex-grow flex items-center justify-center text-sm text-slate-500">
+                <div className="flex-grow flex items-center justify-center text-sm text-slate-500 py-8">
                     No data to display.
                 </div>
             </div>
@@ -46,7 +44,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     let cumulativePercent = 0;
     const slices = Object.entries(data).map(([key, value]) => {
         const percent = value / total;
-        // Fix: Explicitly cast `cumulativePercent` to a number to prevent type errors in the arithmetic operation.
+        // Fix: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type. Restoring explicit `Number()` conversion.
         const startAngle = Number(cumulativePercent) * 360;
         const endAngle = (cumulativePercent + percent) * 360;
         cumulativePercent += percent;
@@ -60,10 +58,10 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     };
 
     return (
-        <div className="bg-white/80 dark:bg-slate-800/80 p-4 rounded-lg shadow-md h-full flex flex-col">
-            <h3 className="text-md font-semibold text-slate-700 dark:text-slate-300 mb-2">{title}</h3>
-            <div className="flex-grow flex flex-col md:flex-row items-center justify-center gap-4">
-                <div className="relative w-32 h-32 md:w-36 md:h-36">
+        <div className="bg-white/80 dark:bg-slate-800/80 p-2 rounded-lg shadow-md flex flex-col">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">{title}</h3>
+            <div className="flex items-center justify-center gap-2">
+                <div className="relative w-20 h-20">
                     <svg viewBox="-1 -1 2 2" className="transform -rotate-90">
                         {slices.map((slice, index) => {
                             let [startX, startY] = getCoordinatesForPercent(slice.startAngle / 360);
@@ -78,12 +76,12 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
                         })}
                     </svg>
                 </div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">
-                    <ul className="space-y-1">
+                <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                    <ul className="space-y-0">
                         {slices.map((slice, index) => (
-                            <li key={slice.key} className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[index % colors.length] }}></span>
-                                <span>{slice.key}: <strong>{slice.value}</strong> ({ (slice.percent * 100).toFixed(1) }%)</span>
+                            <li key={slice.key} className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[index % colors.length] }}></span>
+                                <span>{slice.key}: <strong>{slice.value}</strong></span>
                             </li>
                         ))}
                     </ul>
@@ -184,17 +182,20 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                 <h2 className="text-lg font-semibold">Support Ticket Dashboard</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {/* --- ANALYTICS OVERVIEW SECTION --- */}
+                {/* --- KPI CARDS --- */}
                 <div>
-                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Analytics Overview</h3>
-                     {/* KPIs */}
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Key Metrics</h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                          <KpiCard title="Total Tickets" value={analytics.total} icon={<ClipboardDocumentListIcon className="w-6 h-6" />} color="blue"/>
                          <KpiCard title="Open Tickets" value={analytics.open} icon={<ClockIcon className="w-6 h-6" />} color="yellow" />
                          <KpiCard title="Resolved Tickets" value={analytics.resolved} icon={<CheckCircleIcon className="w-6 h-6" />} color="green" />
                          <KpiCard title="Auto Resolved" value={autoResolvedCount} icon={<SparklesIcon className="w-6 h-6" />} color="purple"/>
                      </div>
-                     {/* Charts */}
+                </div>
+
+                {/* --- CHARTS --- */}
+                <div>
+                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Analytics Breakdown</h3>
                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <PieChart title="Tickets by Category" data={analytics.byCategory} />
                         <PieChart title="Tickets by Status" data={analytics.byStatus} />
@@ -212,7 +213,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                         <KpiCard title="Calls Forwarded" value={callStats.forwardedCalls} icon={<UserIcon className="w-6 h-6" />} color="indigo"/>
                     </div>
                 </div>
-                
+
                 {/* --- TICKETS TABLE SECTION --- */}
                 <div>
                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Live Tickets</h3>

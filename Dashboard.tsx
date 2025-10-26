@@ -14,6 +14,7 @@ const initialTechnicians: Technician[] = [
 const Dashboard: React.FC = () => {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [technicians] = useState<Technician[]>(initialTechnicians);
+    const [autoResolvedCount, setAutoResolvedCount] = useState(0);
 
     const handleTicketCreated = useCallback((newTicketInfo: Omit<Ticket, 'id' | 'status' | 'assignedTo'>) => {
         setTickets(prevTickets => {
@@ -43,17 +44,24 @@ const Dashboard: React.FC = () => {
         });
     }, [technicians]);
 
+    const handleTicketAutoResolved = useCallback(() => {
+        setAutoResolvedCount(prev => prev + 1);
+        console.log(`--- NOTIFICATION ---`);
+        console.log(`An issue was resolved automatically by the AI agent.`);
+        console.log(`--------------------`);
+    }, []);
+
     return (
-        <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-200">
-            <header className="flex-shrink-0 bg-white dark:bg-slate-800/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 shadow-sm p-4">
+        <div className="flex flex-col h-screen bg-gradient-to-br from-sky-100 to-indigo-200 dark:from-slate-900 dark:to-slate-800 font-sans text-slate-800 dark:text-slate-200">
+            <header className="flex-shrink-0 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 shadow-sm p-4">
                 <h1 className="text-xl font-bold text-center">Stratowave Solutions - Agent Dashboard</h1>
             </header>
             <main className="flex-1 flex flex-col lg:flex-row gap-6 p-6 overflow-hidden">
                 <div className="lg:w-1/2 xl:w-1/3 flex flex-col h-full">
-                    <AgentPanel onTicketCreated={handleTicketCreated} />
+                    <AgentPanel onTicketCreated={handleTicketCreated} onTicketAutoResolved={handleTicketAutoResolved} />
                 </div>
                 <div className="lg:w-1/2 xl:w-2/3 flex flex-col h-full">
-                    <DashboardPanel tickets={tickets} technicians={technicians} />
+                    <DashboardPanel tickets={tickets} technicians={technicians} autoResolvedCount={autoResolvedCount} />
                 </div>
             </main>
         </div>

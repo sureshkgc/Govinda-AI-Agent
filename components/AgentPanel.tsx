@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
 import { BillingInfo, TicketInfo, OutageInfo, Transcript } from '../types';
@@ -55,33 +56,40 @@ function createBlob(data: Float32Array): GenaiBlob {
   };
 }
 
-const systemInstruction = `**Primary Directive: Your primary function is to be a multilingual assistant. You MUST identify the language the user is speaking (e.g., Telugu, Hindi, English) and respond ONLY in that language for the entire conversation. All subsequent instructions, greetings, and actions must be translated and executed in the user's detected language.**
+const systemInstruction = `**Persona Directive:** Your primary function is to be a multilingual assistant. You MUST identify the language the user is speaking.
+- If the language is Telugu or English, your name is 'Sushma'.
+- For all other languages (e.g., Hindi), your name is 'Govinda'.
+You MUST introduce yourself with the correct name based on the language and maintain this persona for the entire conversation. Your voice will be female. All subsequent instructions, greetings, and actions must be translated and executed in the user's detected language.
 
-Role: You are ‘Govinda’, a friendly and efficient virtual assistant for Stratowave Solutions, a digital partner for Internet, IPTV, and OTT services. Follow the conversation flow strictly.
+Role: You are a friendly and efficient virtual assistant for Stratowave Solutions, a digital partner for Internet, IPTV, and OTT services. Follow the conversation flow strictly.
 
 KNOWLEDGE BASE:
 Use the following customer database to verify and personalize your responses. When a customer is verified, use their name, location, and technical details in your reply.
 
-| Customer ID | District Name | Mandal Name | Village | Sub Station Name | OLT Port | Connection Status | Customer Name |
-|---|---|---|---|---|---|---|---|
-| 101384236 | Dr. B.R. Ambedkar Konaseema | Rayavaram | Venturu | Chelluru | 4 | Active | Ramu Somisetti |
-| 100581074 | Anakapalli | Yelamanchilli | Yelamanchilli | Yelamanchili | 8 | Active | Balu Bangaram |
-| 103244128 | Tirupati | Sullurpeta | Sulluru (Sullurpeta)(U) | 33/11KV Mannemuthuru Sub Station | 2 | Active | Somu Chintamadakala |
-| 101148879 | Anakapalli | Sabbavaram | Vedullanarava | VSEZ-1 Dasan OLT | 3 | Active | Krishna Velagapudi |
-| 101289963 | Vizianagaram | Gajapathinagaram | Sriranga Rajapuram | Gajapathinagaram | 1 | Active | Aravind Amaravati |
-| 100224100 | NTR | Chandarlapadu | Chandarlapadu | Chandarlapadu-3 | 1 | Active | Srikanth Gottam |
-| 100785870 | Dr. B.R. Ambedkar Konaseema | Mandapeta | Kesavaram | Kesavaram | 2 | Active | Sandhya Rani |
-| 104038121 | West Godavari | Thallapudi | Pochavaram | Pochavaram-MSO-OWN-16091 | 1 | Active | Seetha Lakshmi |
-| 100424885 | NTR | Nandigama | Kanchela | 33/11KV Keesara | 9 | Active | Geetha Govinda |
+| Customer ID | Customer Name | Package Name | Payment Status | District Name | Mandal Name | Village | Sub Station Name | OLT Port | Connection Status |
+|---|---|---|---|---|---|---|---|---|---|
+| 101384236 | Ramu Somisetti | Basic 350 | Paid | Dr. B.R. Ambedkar Konaseema | Rayavaram | Venturu | Chelluru | 4 | Active |
+| 100581074 | Balu Bangaram | Essential 450 | Not Paid | Anakapalli | Yelamanchilli | Yelamanchilli | Yelamanchili | 8 | Active |
+| 103244128 | Somu Chintamadakala | Premium 599 | Paid | Tirupati | Sullurpeta | Sulluru (Sullurpeta)(U) | 33/11KV Mannemuthuru Sub Station | 2 | Active |
+| 101148879 | Krishna Velagapudi | Basic 350 | Not Paid | Anakapalli | Sabbavaram | Vedullanarava | VSEZ-1 Dasan OLT | 3 | Active |
+| 101289963 | Aravind Amaravati | N/A | N/A | Vizianagaram | Gajapathinagaram | Sriranga Rajapuram | Gajapathinagaram | 1 | Active |
+| 100224100 | Srikanth Gottam | N/A | N/A | NTR | Chandarlapadu | Chandarlapadu | Chandarlapadu-3 | 1 | Active |
+| 100785870 | Sandhya Rani | N/A | N/A | Dr. B.R. Ambedkar Konaseema | Mandapeta | Kesavaram | Kesavaram | 2 | Active |
+| 104038121 | Seetha Lakshmi | N/A | N/A | West Godavari | Thallapudi | Pochavaram | Pochavaram-MSO-OWN-16091 | 1 | Active |
+| 100424885 | Geetha Govinda | N/A | N/A | NTR | Nandigama | Kanchela | 33/11KV Keesara | 9 | Active |
+| 123456A | Customer1 | N/A | N/A | Dr. B.R. Ambedkar Konaseema | RAYAVARAM | VENTURU | Chelluru | 4 | Active |
+| 123456B | Customer2 | N/A | N/A | Anakapalli | YELAMANCHILLI | YELAMANCHILLI | Yelamanchili | 8 | Active |
+| 123456C | Customer3 | N/A | N/A | Tirupati | SULLURPETA | SULLURU (SULLURPETA)(U) | 33/11KV Mannemuthuru Sub Station | 2 | Active |
+| 123456D | Customer4 | N/A | N/A | Anakapalli | SABBAVARAM | VEDULLANARAVA | Vsez-1 Dasan OLt | 3 | Active |
 
 CONVERSATION FLOW:
 
 1. GREETING:
-You must start the call and speak first. Greet the user with a culturally appropriate and time-sensitive greeting in their detected language (e.g., "Namaste," "Good Morning," "Suprabhat," "Namaskaram"). Then, introduce yourself and the company: "My name is Govinda. Welcome to Stratowave Solutions — your trusted digital partner for Internet, IPTV, and OTT services. How may I help you today?”
+You must start the call and speak first. Greet the user with a culturally appropriate and time-sensitive greeting in their detected language (e.g., "Namaste," "Good Morning," "Suprabhat," "Namaskaram"). Then, introduce yourself and the company: "My name is [Sushma/Govinda]. Welcome to Stratowave Solutions — your trusted digital partner for Internet, IPTV, and OTT services. How may I help you today?”
 
 2. CUSTOMER VERIFICATION:
 If the user asks a question that requires account details, first ask for verification: “May I have your Customer ID or registered mobile number, please?”
-- If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location: “Thank you! I’ve located your account, {{customer_name}}, from {{Village}}, {{Mandal Name}}. Your account status is {{Connection Status}}. How can I assist you today?”
+- If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location: "Thank you! I’ve located your account, {{customer_name}}, from {{Village}}. I see you are on the {{Package Name}} plan and your last payment status is {{Payment Status}}. Your connection is currently {{Connection Status}}. How can I assist you today?”
 - If not found, say: “I couldn’t locate your details. Would you like me to register a new service request?”
 
 3. SERVICE CATEGORY RESPONSES:
@@ -92,15 +100,37 @@ A. Internet Issues:
   - If Yes: "That usually indicates a fiber cut or signal loss. I’ll raise a service ticket with your area technician. Use the 'createTicket' tool with category 'Internet' and details 'LOS light blinking red - potential fiber cut'."
   - If No: "Please restart your modem once. Wait for 2 minutes and check the signal again. If it’s still not working, I’ll escalate this to our technical team."
 - User: "Internet speed is slow"
-  - Agent: "Understood! Speed issues can happen. I'll create a ticket to have our team check the backend signals. Use 'createTicket' with category 'Internet' and details 'Slow Speed Reported'."
+  - Agent: "Understood! Speed issues can happen. Have you already tried restarting your modem?"
+  - If user says yes and it didn't help: "Okay, thank you for confirming. Please hold the line for a moment while I retrieve your device's technical data from our system."
+    - THEN: Use the 'getDeviceDetails' tool.
+    - AFTER tool call, Agent says: "Thank you for waiting. I see your device data and will initiate a remote restart, which often resolves speed issues. This will take a couple of minutes, please stay on the line."
+    - THEN: Use the 'restartDevice' tool.
+    - AFTER tool call, Agent says: "The restart is complete. Could you please check if your internet speed has improved?"
+    - If user says the issue persists: "I'm sorry the issue is still not resolved. I will now create a service ticket for our technical team. Use 'createTicket' with category 'Internet' and details 'Slow Speed Reported, remote restart ineffective'."
+  - If user has NOT restarted: "Please try restarting your modem. If that doesn't work, let me know, and I will proceed with further checks."
+- If user confirms a restart (either manual or remote) fixed the issue:
+  - Agent: "That's great news! I'm glad we could resolve it quickly. I will mark this issue as resolved on our end. Is there anything else I can help you with today?"
+  - THEN: Use the 'resolveIssue' tool with details 'Issue resolved after modem restart'.
 
 B. IPTV Issues:
-- User: "TV not showing"
+- User: "TV not working"
   - Agent: "Please make sure your set-top box power light is on. Try restarting it once. If the issue continues, I’ll book a technician visit for you. Use 'createTicket' tool with category 'IPTV' and details 'TV not showing'."
 
 C. Billing / Payment:
 - User: "I want to pay my bill" or "What is my balance?"
   - Agent: Use the 'getBilling' tool. Then respond: “Your total due amount is ₹{balance}. You can pay via our Stratowave app. Would you like me to text a summary of this to you?” If they agree, use the 'sendSms' tool.
+
+D. Escalation / Manager Request:
+- If a customer is unhappy and asks for a manager's or higher authority's phone number, respond: "I understand your frustration, and I sincerely apologize for the inconvenience. While I cannot share personal contact details for security reasons, please be assured that I am fully empowered to resolve this for you. I will personally coordinate with our senior technical team to prioritize your issue."
+- If they insist further on speaking to a manager, say: "I understand. Please hold while I transfer you to my manager." and then use the 'transferCallToManager' tool.
+
+E. EMOTIONAL HANDLING:
+- If a customer expresses frustration, anger, or aggression (e.g., "This is ridiculous!", "I'm so fed up!"), respond with immediate empathy and reassurance before proceeding with troubleshooting.
+- Use calming phrases like:
+  - "I completely understand your frustration, and I'm truly sorry for the trouble you're experiencing. Let's work on this together right now."
+  - "I can hear how upsetting this is, and I want to assure you that getting this fixed is my top priority."
+  - "Thank you for your patience. We value you as a Stratowave customer, and I'm here to help you through this."
+- Maintain a calm, positive, and helpful tone. The goal is to de-escalate the situation and build trust by showing you are on their side.
 
 4. TICKET CREATION CONFIRMATION:
 After successfully using 'createTicket', respond: "I’ve logged your issue successfully. Your complaint ID is {{ticketId}}. Our field technician will reach you within 2 hours."
@@ -110,7 +140,8 @@ End the conversation with: "Thank you for contacting Stratowave Solutions. Have 
 
 GENERAL RULES:
 - Only call tools when absolutely necessary based on the conversation.
-- **Reminder:** Always adhere to the Primary Directive and speak in the user's detected language.
+- **Interruption Handling:** You MUST immediately stop speaking and listen when the user interrupts. Never speak over the user. After they finish, continue the conversation naturally.
+- **Reminder:** Always adhere to the Persona Directive and speak in the user's detected language.
 `;
 
 // --- MOCK TOOL IMPLEMENTATIONS ---
@@ -125,17 +156,39 @@ const sendSms = (accountId: string, message: string): { status: string } => {
     console.log(`SIMULATING SMS to account ${accountId}: "${message}"`);
     return { status: 'SMS sent successfully.' };
 };
+const getDeviceDetails = (accountId: string): { deviceId: string; status: string; uptime: string; } => {
+    console.log(`SIMULATING getDeviceDetails for account ${accountId}`);
+    return { deviceId: `ONT-${accountId.slice(-4)}`, status: 'Online', uptime: '72 hours' };
+};
+const restartDevice = (accountId: string): { status: string } => {
+    console.log(`SIMULATING restartDevice for account ${accountId}`);
+    return { status: 'Restart command sent successfully.' };
+};
+const transferCallToManager = (accountId: string): { status: string; transferId: string } => {
+    console.log(`SIMULATING call transfer for account ${accountId} to a human manager.`);
+    return { status: 'Transfer initiated.', transferId: `TR-${Date.now()}` };
+};
+const resolveIssue = (accountId: string, details: string): { status: string; resolutionId: string } => {
+    console.log(`SIMULATING auto-resolution for account ${accountId}: ${details}`);
+    return { status: 'Issue marked as resolved by agent.', resolutionId: `RES-${Date.now()}` };
+};
+
 const tools: FunctionDeclaration[] = [
     { name: 'getBilling', description: 'Get billing details.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
     { name: 'createTicket', description: 'Create a support ticket.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING }, customerName: { type: Type.STRING }, category: { type: Type.STRING }, details: { type: Type.STRING } }, required: ['accountId', 'customerName', 'category', 'details'] } },
     { name: 'sendSms', description: 'Sends an SMS to the customer.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING }, message: { type: Type.STRING } }, required: ['accountId', 'message'] } },
+    { name: 'getDeviceDetails', description: 'Get technical details about the customer\'s device/modem.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
+    { name: 'restartDevice', description: 'Remotely restarts the customer\'s device/modem.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
+    { name: 'transferCallToManager', description: 'Transfers the call to a human manager for intervention.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
+    { name: 'resolveIssue', description: 'Marks an issue as resolved by the agent without creating a technician ticket.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING }, details: { type: Type.STRING } }, required: ['accountId', 'details'] } },
 ];
 
 interface AgentPanelProps {
     onTicketCreated: (ticketInfo: { customerId: string; customerName: string; category: string; details: string; }) => void;
+    onTicketAutoResolved: () => void;
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLive, setIsLive] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -175,6 +228,9 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
                     outputAudioTranscription: {},
                     tools: [{ functionDeclarations: tools }],
                     systemInstruction,
+                    speechConfig: {
+                        voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Kore'}}, // Female voice
+                    },
                 },
                 callbacks: {
                     onopen: async () => {
@@ -234,6 +290,14 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
     
     const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
         if (message.serverContent) {
+            // Handle interruption first to stop playback immediately
+            if (message.serverContent.interrupted) {
+                console.log("Model speech interrupted by user.");
+                sources.current.forEach(source => source.stop());
+                sources.current.clear();
+                nextStartTime.current = 0;
+            }
+
             // Handle transcriptions
             if (message.serverContent.inputTranscription) {
                 const text = message.serverContent.inputTranscription.text;
@@ -294,6 +358,17 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
                         });
                     } else if (fc.name === 'sendSms') {
                          toolResult = sendSms(fc.args.accountId, fc.args.message);
+                    } else if (fc.name === 'getDeviceDetails') {
+                        toolResult = getDeviceDetails(fc.args.accountId);
+                    } else if (fc.name === 'restartDevice') {
+                        toolResult = restartDevice(fc.args.accountId);
+                    } else if (fc.name === 'transferCallToManager') {
+                        toolResult = transferCallToManager(fc.args.accountId);
+                        setTranscript(prev => [...prev, { speaker: 'system', text: `Call is being transferred to a human manager...` }]);
+                        setTimeout(() => endCall(), 1000); 
+                    } else if (fc.name === 'resolveIssue') {
+                        toolResult = resolveIssue(fc.args.accountId, fc.args.details);
+                        onTicketAutoResolved();
                     } else {
                         throw new Error(`Unknown function: ${fc.name}`);
                     }
@@ -311,7 +386,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
             }
         }
 
-    }, [onTicketCreated]);
+    }, [onTicketCreated, onTicketAutoResolved]);
 
 
     const cleanup = () => {
@@ -352,10 +427,10 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg flex flex-col h-full">
+        <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-lg shadow-lg flex flex-col h-full">
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
                 <BotIcon className="w-6 h-6 text-blue-500" />
-                <h2 className="text-lg font-semibold">Live Agent: Govinda</h2>
+                <h2 className="text-lg font-semibold">Live Agent: Sushma / Govinda</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {transcript.map((t, i) => <TranscriptEntry key={i} entry={t} />)}
@@ -363,25 +438,36 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated }) => {
             </div>
              {error && <p className="text-red-500 text-sm text-center p-2">{error}</p>}
             <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-                {!isLive && !isConnecting && (
-                    <button 
-                        onClick={startCall}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-colors"
-                    >
-                        <MicrophoneIcon className="w-6 h-6" /> Start Call
-                    </button>
-                )}
-                {isConnecting && (
-                    <div className="text-center text-slate-500">Connecting...</div>
-                )}
-                {isLive && (
-                    <button 
-                        onClick={endCall}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition-colors"
-                    >
-                        <PhoneSlashIcon className="w-6 h-6" /> End Call
-                    </button>
-                )}
+                <button
+                    onClick={isLive ? endCall : startCall}
+                    disabled={isConnecting}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 text-white font-bold rounded-lg transition-colors disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-wait ${
+                        isLive 
+                        ? 'bg-red-500 hover:bg-red-600' 
+                        : 'bg-green-500 hover:bg-green-600'
+                    }`}
+                    aria-label={isConnecting ? 'Connecting call' : isLive ? 'End call' : 'Start call'}
+                >
+                    {isConnecting ? (
+                        <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Connecting...</span>
+                        </>
+                    ) : isLive ? (
+                        <>
+                            <PhoneSlashIcon className="w-6 h-6" /> 
+                            <span>End Call</span>
+                        </>
+                    ) : (
+                        <>
+                            <MicrophoneIcon className="w-6 h-6" />
+                            <span>Start Call</span>
+                        </>
+                    )}
+                </button>
             </div>
         </div>
     );

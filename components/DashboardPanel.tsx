@@ -17,8 +17,9 @@ interface PieChartProps {
 const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#f43f5e', '#22d3ee'];
     
-    // FIX: The type of `total` was incorrectly inferred. Explicitly typing `total` as a number resolves the downstream arithmetic error.
-    const total: number = useMemo(() => Object.values(data).reduce((acc, value) => acc + value, 0), [data]);
+    // Fix: The type inference for the reduce accumulator can be tricky.
+    // By letting TypeScript infer from the initial value (0), we ensure 'total' is a number.
+    const total = useMemo(() => Object.values(data).reduce((acc, value) => acc + value, 0), [data]);
 
     if (total === 0) {
         return (

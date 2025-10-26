@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
 import { BillingInfo, TicketInfo, OutageInfo, Transcript } from '../types';
@@ -56,10 +55,7 @@ function createBlob(data: Float32Array): GenaiBlob {
   };
 }
 
-const systemInstruction = `**Persona Directive:** Your primary function is to be a multilingual assistant. You MUST identify the language the user is speaking.
-- If the language is Telugu or English, your name is 'Sushma'.
-- For all other languages (e.g., Hindi), your name is 'Govinda'.
-You MUST introduce yourself with the correct name based on the language and maintain this persona for the entire conversation. All subsequent instructions, greetings, and actions must be translated and executed in the user's detected language.
+const systemInstruction = `**Persona Directive:** Your name is 'Sushma'. You are a friendly and multilingual assistant. You MUST identify the language the user is speaking and respond in that language. You MUST introduce yourself as 'Sushma' at the start of the conversation and maintain this persona throughout.
 
 Role: You are a friendly and efficient virtual assistant for Stratowave Solutions, a digital partner for Internet, IPTV, and OTT services. Follow the conversation flow strictly.
 
@@ -85,7 +81,7 @@ Use the following customer database to verify and personalize your responses. Wh
 CONVERSATION FLOW:
 
 1. GREETING:
-You must start the call and speak first. Greet the user with a culturally appropriate and time-sensitive greeting in their detected language (e.g., "Namaste," "Good Morning," "Suprabhat," "Namaskaram"). Then, introduce yourself and the company: "My name is [Sushma/Govinda]. Welcome to Stratowave Solutions — your trusted digital partner for Internet, IPTV, and OTT services. How may I help you today?”
+You must start the call and speak first. Greet the user with a culturally appropriate and time-sensitive greeting in their detected language (e.g., "Namaste," "Good Morning," "Suprabhat," "Namaskaram"). Then, introduce yourself and the company: "My name is Sushma. Welcome to Stratowave Solutions — your trusted digital partner for Internet, IPTV, and OTT services. How may I help you today?”
 
 2. CUSTOMER VERIFICATION:
 If the user asks a question that requires account details, first ask for verification: “May I have your Customer ID or registered mobile number, please?”
@@ -222,6 +218,8 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
             
             outputAudioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
+            const voiceName = 'Kore'; // Female voice for Sushma
+
             sessionPromise.current = ai.live.connect({
                 model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
@@ -231,7 +229,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                     tools: [{ functionDeclarations: tools }],
                     systemInstruction,
                     speechConfig: {
-                        voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Puck'}}, // Male voice
+                        voiceConfig: {prebuiltVoiceConfig: {voiceName: voiceName}},
                     },
                 },
                 callbacks: {
@@ -432,7 +430,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
         <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-lg shadow-lg flex flex-col h-full">
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
                 <BotIcon className="w-6 h-6 text-blue-500" />
-                <h2 className="text-lg font-semibold">Live Agent: Sushma / Govinda</h2>
+                <h2 className="text-lg font-semibold">Live Agent: Sushma</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {transcript.map((t, i) => <TranscriptEntry key={i} entry={t} />)}
@@ -452,7 +450,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                 >
                     {isConnecting ? (
                         <>
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>

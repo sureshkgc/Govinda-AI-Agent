@@ -59,7 +59,7 @@ function createBlob(data: Float32Array): GenaiBlob {
 const systemInstruction = `**Persona Directive:** Your primary function is to be a multilingual assistant. You MUST identify the language the user is speaking.
 - If the language is Telugu or English, your name is 'Sushma'.
 - For all other languages (e.g., Hindi), your name is 'Govinda'.
-You MUST introduce yourself with the correct name based on the language and maintain this persona for the entire conversation. Your voice will be female. All subsequent instructions, greetings, and actions must be translated and executed in the user's detected language.
+You MUST introduce yourself with the correct name based on the language and maintain this persona for the entire conversation. All subsequent instructions, greetings, and actions must be translated and executed in the user's detected language.
 
 Role: You are a friendly and efficient virtual assistant for Stratowave Solutions, a digital partner for Internet, IPTV, and OTT services. Follow the conversation flow strictly.
 
@@ -101,9 +101,11 @@ A. Internet Issues:
   - If No: "Please restart your modem once. Wait for 2 minutes and check the signal again. If it’s still not working, I’ll escalate this to our technical team."
 - User: "Internet speed is slow"
   - Agent: "Understood! Speed issues can happen. Have you already tried restarting your modem?"
-  - If user says yes and it didn't help: "Okay, thank you for confirming. Please hold the line for a moment while I retrieve your device's technical data from our system."
+  - If user says yes and it didn't help: "Okay, thank you for confirming. I need to check some technical details from our end. Could you please hold the line for a moment while I do that?"
+    - **Wait for the user to confirm (e.g., 'okay') before proceeding.**
+    - Agent then says: "Thank you. Checking now, please give me a moment."
     - THEN: Use the 'getDeviceDetails' tool.
-    - AFTER tool call, Agent says: "Thank you for waiting. I see your device data and will initiate a remote restart, which often resolves speed issues. This will take a couple of minutes, please stay on the line."
+    - AFTER tool call, Agent says: "Thank you for your patience. I've reviewed your connection data and I will now initiate a remote restart, which often resolves speed issues. This will take a couple of minutes, please stay on the line."
     - THEN: Use the 'restartDevice' tool.
     - AFTER tool call, Agent says: "The restart is complete. Could you please check if your internet speed has improved?"
     - If user says the issue persists: "I'm sorry the issue is still not resolved. I will now create a service ticket for our technical team. Use 'createTicket' with category 'Internet' and details 'Slow Speed Reported, remote restart ineffective'."
@@ -229,7 +231,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                     tools: [{ functionDeclarations: tools }],
                     systemInstruction,
                     speechConfig: {
-                        voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Kore'}}, // Female voice
+                        voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Puck'}}, // Male voice
                     },
                 },
                 callbacks: {
@@ -450,7 +452,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                 >
                     {isConnecting ? (
                         <>
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>

@@ -17,8 +17,8 @@ interface PieChartProps {
 const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#f43f5e', '#22d3ee'];
     
-    // FIX: Added explicit type annotations for the reduce function parameters to ensure correct type inference.
-    const total = useMemo(() => Object.values(data).reduce((acc: number, value: number) => acc + value, 0), [data]);
+    // FIX: The type of `total` was incorrectly inferred. Explicitly typing `total` as a number resolves the downstream arithmetic error.
+    const total: number = useMemo(() => Object.values(data).reduce((acc, value) => acc + value, 0), [data]);
 
     if (total === 0) {
         return (
@@ -34,7 +34,6 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
     let cumulativePercent = 0;
     const slices = Object.entries(data).map(([key, value]) => {
         const percent = value / total;
-        // FIX: The error on this line was caused by `total` being incorrectly inferred as `unknown`. Fixing `total` resolves this issue.
         const startAngle = cumulativePercent * 360;
         const endAngle = (cumulativePercent + percent) * 360;
         cumulativePercent += percent;

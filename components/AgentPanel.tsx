@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
-import { BillingInfo, Ticket, Transcript } from '../types';
+import { BillingInfo, Ticket, Transcript, Technician } from '../types';
 import { BotIcon, MicrophoneIcon, PhoneSlashIcon } from './icons';
 import TranscriptEntry from './TranscriptEntry';
 
@@ -134,7 +135,7 @@ E. EMOTIONAL HANDLING:
 - Maintain a calm, positive, and helpful tone. The goal is to de-escalate the situation and build trust by showing you are on their side.
 
 4. TICKET CREATION CONFIRMATION:
-After successfully using 'createTicket', respond: "I’ve logged your issue successfully. Your complaint ID is {{ticketId}}. Our field technician will reach you within 2 hours."
+After successfully using 'createTicket', respond: "I’ve logged your issue successfully. Your complaint ID is {{ticketId}}. I have assigned this to our technician, {{technicianName}}, who will reach you within 2 hours."
 
 5. CLOSING:
 End the conversation with: "Thank you for contacting Stratowave Solutions. Have a great day!" (in the current language of conversation).
@@ -186,14 +187,15 @@ const tools: FunctionDeclaration[] = [
 ];
 
 interface AgentPanelProps {
-    onTicketCreated: (ticketInfo: Omit<Ticket, 'status' | 'assignedTo'>) => void;
+    onTicketCreated: (ticket: Ticket) => void;
     onTicketAutoResolved: () => void;
     onCallStarted: () => void;
     onCallForwarded: () => void;
     onCallEnded: (transcript: Transcript[]) => void;
+    technicians: Technician[];
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onCallStarted, onCallForwarded, onCallEnded }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onCallStarted, onCallForwarded, onCallEnded, technicians }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLive, setIsLive] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -358,18 +360,33 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                         toolResult = getBilling(fc.args.accountId);
                     } else if (fc.name === 'createTicket') {
                         const ticketId = `TCK-${Math.floor(10000 + Math.random() * 90000)}`;
+                        
+                        const category = fc.args.category;
+                        const availableTechnicians = technicians.filter(t => 
+                            t.skills.includes(category) || t.skills.includes(category.split(' ')[0])
+                        );
+                        const assignedTechnician = availableTechnicians.length > 0
+                            ? availableTechnicians[Math.floor(Math.random() * availableTechnicians.length)]
+                            : technicians[Math.floor(Math.random() * technicians.length)];
+
                         toolResult = {
                             ticketId: ticketId,
                             priority: 'Normal',
                             eta: '2 hours',
+                            technicianName: assignedTechnician.name,
                         };
-                        onTicketCreated({
+                        
+                        const newTicket: Ticket = {
                             id: ticketId,
                             customerId: fc.args.accountId,
                             customerName: fc.args.customerName,
                             category: fc.args.category,
-                            details: fc.args.details
-                        });
+                            details: fc.args.details,
+                            status: 'Assigned',
+                            assignedTo: assignedTechnician.id,
+                        };
+
+                        onTicketCreated(newTicket);
                     } else if (fc.name === 'sendSms') {
                          toolResult = sendSms(fc.args.accountId, fc.args.message);
                     } else if (fc.name === 'getDeviceDetails') {
@@ -401,7 +418,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
             }
         }
 
-    }, [onTicketCreated, onTicketAutoResolved, onCallForwarded]);
+    }, [onTicketCreated, onTicketAutoResolved, onCallForwarded, technicians]);
 
 
     const cleanup = () => {

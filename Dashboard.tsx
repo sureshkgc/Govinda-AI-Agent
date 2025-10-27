@@ -24,27 +24,18 @@ const Dashboard: React.FC = () => {
         forwardedCalls: 0,
     });
 
-    const handleTicketCreated = useCallback((newTicketInfo: Omit<Ticket, 'status' | 'assignedTo'>) => {
+    const handleTicketCreated = useCallback((newTicket: Ticket) => {
         setTickets(prevTickets => {
-            const availableTechnicians = technicians.filter(t => 
-                t.skills.includes(newTicketInfo.category) || t.skills.includes(newTicketInfo.category.split(' ')[0])
-            );
-            const assignedTechnician = availableTechnicians.length > 0
-                ? availableTechnicians[Math.floor(Math.random() * availableTechnicians.length)]
-                : technicians[Math.floor(Math.random() * technicians.length)];
+            const assignedTechnician = technicians.find(t => t.id === newTicket.assignedTo);
 
-            const newTicket: Ticket = {
-                ...newTicketInfo,
-                status: 'Assigned',
-                assignedTo: assignedTechnician.id,
-            };
-
-            // Simulate notifications
-            console.log(`--- NOTIFICATION ---`);
-            console.log(`Ticket ${newTicket.id} ASSIGNED to ${assignedTechnician.name}.`);
-            console.log(`  -> SMS to Customer (${newTicket.customerName}): "Your ticket ${newTicket.id} has been assigned to technician ${assignedTechnician.name}. Expect a call shortly."`);
-            console.log(`  -> SMS to Technician (${assignedTechnician.name}): "New ticket ${newTicket.id} for ${newTicket.customerName} (${newTicket.category}) has been assigned to you."`);
-            console.log(`--------------------`);
+            if (assignedTechnician) {
+                 // Simulate notifications
+                console.log(`--- NOTIFICATION ---`);
+                console.log(`Ticket ${newTicket.id} ASSIGNED to ${assignedTechnician.name}.`);
+                console.log(`  -> SMS to Customer (${newTicket.customerName}): "Your ticket ${newTicket.id} has been assigned to technician ${assignedTechnician.name}. Expect a call shortly."`);
+                console.log(`  -> SMS to Technician (${assignedTechnician.name}): "New ticket ${newTicket.id} for ${newTicket.customerName} (${newTicket.category}) has been assigned to you."`);
+                console.log(`--------------------`);
+            }
 
 
             return [...prevTickets, newTicket];
@@ -106,6 +97,7 @@ const Dashboard: React.FC = () => {
                         onCallStarted={handleCallStarted}
                         onCallForwarded={handleCallForwarded}
                         onCallEnded={handleCallEnded}
+                        technicians={technicians}
                     />
                 </div>
                 <div className="lg:w-1/2 xl:w-2/3 flex flex-col h-full">

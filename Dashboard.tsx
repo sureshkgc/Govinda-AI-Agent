@@ -1,5 +1,6 @@
+
 import React, { useState, useCallback } from 'react';
-import { Ticket, Technician, CallStats } from './types';
+import { Ticket, Technician, CallStats, Call, Transcript } from './types';
 import AgentPanel from './components/AgentPanel';
 import DashboardPanel from './components/DashboardPanel';
 
@@ -14,6 +15,8 @@ const Dashboard: React.FC = () => {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [technicians] = useState<Technician[]>(initialTechnicians);
     const [autoResolvedCount, setAutoResolvedCount] = useState(0);
+    const [calls, setCalls] = useState<Call[]>([]);
+    const [activeCallId, setActiveCallId] = useState<string | null>(null);
     const [callStats, setCallStats] = useState<CallStats>({
         totalCalls: 0,
         attendedCalls: 0,
@@ -56,6 +59,16 @@ const Dashboard: React.FC = () => {
     }, []);
 
     const handleCallStarted = useCallback(() => {
+        const newCallId = `call-${Date.now()}`;
+        const newCall: Call = { 
+            id: newCallId, 
+            startTime: new Date(), 
+            status: 'In Progress', 
+            transcript: [] 
+        };
+        setCalls(prev => [...prev, newCall]);
+        setActiveCallId(newCallId);
+
         setCallStats(prev => ({
             ...prev,
             totalCalls: prev.totalCalls + 1,
@@ -64,11 +77,21 @@ const Dashboard: React.FC = () => {
     }, []);
 
     const handleCallForwarded = useCallback(() => {
+        setCalls(prevCalls => prevCalls.map(c => 
+            c.id === activeCallId ? { ...c, status: 'Forwarded' } : c
+        ));
         setCallStats(prev => ({
             ...prev,
             forwardedCalls: prev.forwardedCalls + 1,
         }));
-    }, []);
+    }, [activeCallId]);
+    
+    const handleCallEnded = useCallback((finalTranscript: Transcript[]) => {
+        setCalls(prevCalls => prevCalls.map(c => 
+            c.id === activeCallId ? { ...c, status: c.status === 'Forwarded' ? 'Forwarded' : 'Completed', endTime: new Date(), transcript: finalTranscript } : c
+        ));
+        setActiveCallId(null);
+    }, [activeCallId]);
 
     return (
         <div className="flex flex-col h-screen bg-gradient-to-br from-sky-100 to-indigo-200 dark:from-slate-900 dark:to-slate-800 font-sans text-slate-800 dark:text-slate-200">
@@ -82,10 +105,17 @@ const Dashboard: React.FC = () => {
                         onTicketAutoResolved={handleTicketAutoResolved}
                         onCallStarted={handleCallStarted}
                         onCallForwarded={handleCallForwarded}
+                        onCallEnded={handleCallEnded}
                     />
                 </div>
                 <div className="lg:w-1/2 xl:w-2/3 flex flex-col h-full">
-                    <DashboardPanel tickets={tickets} technicians={technicians} autoResolvedCount={autoResolvedCount} callStats={callStats} />
+                    <DashboardPanel 
+                        tickets={tickets} 
+                        technicians={technicians} 
+                        autoResolvedCount={autoResolvedCount} 
+                        callStats={callStats} 
+                        calls={calls}
+                    />
                 </div>
             </main>
         </div>

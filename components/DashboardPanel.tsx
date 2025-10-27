@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Ticket, Technician, CallStats } from '../types';
+import { Ticket, Technician, CallStats, Call } from '../types';
 import { 
     TicketIcon, 
     UserIcon, 
@@ -9,7 +9,8 @@ import {
     SparklesIcon,
     PhoneIcon,
     PhoneArrowDownLeftIcon,
-    PhoneXMarkIcon
+    PhoneXMarkIcon,
+    DownloadIcon
 } from './icons';
 
 interface DashboardPanelProps {
@@ -17,6 +18,7 @@ interface DashboardPanelProps {
     technicians: Technician[];
     autoResolvedCount: number;
     callStats: CallStats;
+    calls: Call[];
 }
 
 // --- PIE CHART COMPONENT ---
@@ -41,15 +43,22 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
         )
     }
 
+    // FIX: To avoid potential closure-related type inference issues and the side-effect of modifying
+    // a variable in a .map() callback, a standard for...of loop is used to build the slices array.
+    const slices: { key: string; value: number; percent: number; startAngle: number; endAngle: number }[] = [];
     let cumulativePercent = 0;
-    const slices = Object.entries(data).map(([key, value]) => {
-        const percent = value / total;
-        // Fix: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type. Restoring explicit `Number()` conversion.
-        const startAngle = Number(cumulativePercent) * 360;
+    // Fix: Cast `value` from Object.entries to a number to resolve type errors.
+    // In some TypeScript configurations, `Object.entries` on an object with a string
+    // index signature can return `[string, unknown]`, which causes errors in
+    // arithmetic operations and assignments.
+    for (const [key, value] of Object.entries(data)) {
+        const numericValue = value as number;
+        const percent = numericValue / total;
+        const startAngle = cumulativePercent * 360;
         const endAngle = (cumulativePercent + percent) * 360;
+        slices.push({ key, value: numericValue, percent, startAngle, endAngle });
         cumulativePercent += percent;
-        return { key, value, percent, startAngle, endAngle };
-    });
+    }
 
     const getCoordinatesForPercent = (percent: number) => {
         const x = Math.cos(2 * Math.PI * percent);
@@ -122,7 +131,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color }) => {
 };
 
 
-const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, autoResolvedCount, callStats }) => {
+const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, autoResolvedCount, callStats, calls }) => {
     const getTechnicianName = (id?: string) => {
         if (!id) return 'Unassigned';
         return technicians.find(t => t.id === id)?.name || 'Unknown';
@@ -136,6 +145,18 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
             case 'Resolved': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
             default: return 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300';
         }
+    };
+
+    const formatCallDuration = (start: Date, end?: Date, inProgressValue: string = '-'): string => {
+        if (!end) return inProgressValue;
+        const totalSeconds = Math.round((end.getTime() - start.getTime()) / 1000);
+        
+        if (totalSeconds < 0) return '0s';
+        if (totalSeconds < 60) return `${totalSeconds}s`;
+
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}m ${seconds}s`;
     };
     
     const analytics = useMemo(() => {
@@ -165,6 +186,23 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
         };
     }, [tickets, technicians]);
 
+    const callAnalytics = useMemo(() => {
+        const totalSeconds = calls.reduce((acc, call) => {
+            // Include duration for all calls that have ended, regardless of status (Completed or Forwarded).
+            if (call.status === 'Completed' || call.status === 'Forwarded') {
+                if (call.endTime) {
+                    const duration = (call.endTime.getTime() - call.startTime.getTime()) / 1000;
+                    return acc + (duration > 0 ? duration : 0);
+                }
+            }
+            return acc;
+        }, 0);
+        
+        const totalMinutes = Math.round(totalSeconds / 60);
+
+        return { totalMinutes };
+    }, [calls]);
+
     const ticketsByTechId = useMemo(() => {
         return tickets.reduce((acc, ticket) => {
             if (ticket.assignedTo) {
@@ -173,6 +211,60 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
             return acc;
         }, {} as {[key: string]: number});
     }, [tickets]);
+
+    const downloadCSV = (data: any[], filename: string) => {
+        if (data.length === 0) return;
+
+        const headers = Object.keys(data[0]);
+        const csvRows = [
+            headers.join(','), // header row
+            ...data.map(row => 
+                headers.map(fieldName => 
+                    JSON.stringify(row[fieldName], (key, value) => value === null ? '' : value)
+                ).join(',')
+            )
+        ];
+
+        const csvString = csvRows.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
+    const handleDownloadTickets = () => {
+        if (tickets.length === 0) return;
+        const dataToExport = tickets.map(t => ({
+            ticketId: t.id,
+            customerId: t.customerId,
+            customerName: t.customerName,
+            category: t.category,
+            details: t.details,
+            status: t.status,
+            assignedTo: getTechnicianName(t.assignedTo),
+        }));
+        downloadCSV(dataToExport, 'tickets.csv');
+    };
+
+    const handleDownloadCalls = () => {
+        if (calls.length === 0) return;
+        const dataToExport = calls.map(c => ({
+            callId: c.id,
+            startTime: c.startTime.toISOString(),
+            endTime: c.endTime?.toISOString() || 'N/A',
+            duration: formatCallDuration(c.startTime, c.endTime, 'N/A'),
+            status: c.status,
+            transcript: c.transcript.map(t => `[${t.speaker}] ${t.text}`).join(' | '),
+        }));
+        downloadCSV(dataToExport, 'calls.csv');
+    };
 
 
     return (
@@ -206,9 +298,10 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                 {/* --- CALL CENTER ANALYTICS SECTION --- */}
                 <div>
                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Call Center Analytics</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <KpiCard title="Total Calls Received" value={callStats.totalCalls} icon={<PhoneIcon className="w-6 h-6" />} color="blue"/>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <KpiCard title="Total Calls" value={callStats.totalCalls} icon={<PhoneIcon className="w-6 h-6" />} color="blue"/>
                         <KpiCard title="Calls Attended" value={callStats.attendedCalls} icon={<PhoneArrowDownLeftIcon className="w-6 h-6" />} color="green" />
+                        <KpiCard title="Total Call Minutes" value={callAnalytics.totalMinutes} icon={<ClockIcon className="w-6 h-6" />} color="purple"/>
                         <KpiCard title="Calls Missed" value={callStats.missedCalls} icon={<PhoneXMarkIcon className="w-6 h-6" />} color="red" />
                         <KpiCard title="Calls Forwarded" value={callStats.forwardedCalls} icon={<UserIcon className="w-6 h-6" />} color="indigo"/>
                     </div>
@@ -216,7 +309,17 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
 
                 {/* --- TICKETS TABLE SECTION --- */}
                 <div>
-                    <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Live Tickets</h3>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Live Tickets</h3>
+                        <button 
+                            onClick={handleDownloadTickets}
+                            disabled={tickets.length === 0}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download CSV</span>
+                        </button>
+                    </div>
                     {tickets.length === 0 ? (
                         <div className="text-center p-10 text-slate-500 bg-slate-50/50 dark:bg-slate-900/50 rounded-lg">
                             <p>No tickets yet.</p>
@@ -250,6 +353,63 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                                             <td className="px-6 py-4">{getTechnicianName(ticket.assignedTo)}</td>
                                         </tr>
                                     ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* --- CALL LOG TABLE SECTION --- */}
+                 <div>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Call Log</h3>
+                         <button 
+                            onClick={handleDownloadCalls}
+                            disabled={calls.length === 0}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download CSV</span>
+                        </button>
+                    </div>
+                    {calls.length === 0 ? (
+                        <div className="text-center p-10 text-slate-500 bg-slate-50/50 dark:bg-slate-900/50 rounded-lg">
+                            <p>No calls have been made yet.</p>
+                        </div>
+                    ) : (
+                        <div className="relative overflow-x-auto shadow-md sm:rounded-lg">
+                            <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3">Start Time</th>
+                                        <th scope="col" className="px-6 py-3">Duration</th>
+                                        <th scope="col" className="px-6 py-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[...calls].reverse().map(call => {
+                                        const duration = formatCallDuration(call.startTime, call.endTime);
+                                        const getCallStatusColor = (status: Call['status']) => {
+                                            switch (status) {
+                                                case 'Completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+                                                case 'Forwarded': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
+                                                case 'In Progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+                                                case 'Missed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+                                                default: return 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300';
+                                            }
+                                        };
+                                        return (
+                                            <tr key={call.id} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">
+                                                <td className="px-6 py-4">{call.startTime.toLocaleString()}</td>
+                                                <td className="px-6 py-4">{duration}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCallStatusColor(call.status)}`}>
+                                                        {call.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>

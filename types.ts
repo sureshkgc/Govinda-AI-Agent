@@ -40,6 +40,14 @@ export interface Transcript {
   text: string;
 }
 
+export interface Call {
+  id: string;
+  startTime: Date;
+  endTime?: Date;
+  status: 'In Progress' | 'Completed' | 'Forwarded' | 'Missed';
+  transcript: Transcript[];
+}
+
 export interface CallStats {
   totalCalls: number;
   attendedCalls: number;

@@ -86,7 +86,7 @@ You must start the call and speak first. Greet the user in Telugu. For example: 
 
 2. CUSTOMER VERIFICATION:
 If the user asks a question that requires account details, first ask for verification: “May I have your Customer ID or registered mobile number, please?” (in the current language of conversation).
-- If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location: "Thank you! I’ve located your account, {{customer_name}}, from {{Village}}. I see you are on the {{Package Name}} plan and your last payment status is {{Payment Status}}. Your connection is currently {{Connection Status}}. How can I assist you today?” (in the current language of conversation).
+- If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location. You MUST acknowledge the problem they already stated and move directly to troubleshooting. For example: "Thank you! I’ve located your account, {{customer_name}}, from {{Village}}. I see you are on the {{Package Name}} plan. I understand you're having issues with your internet. Let's get that sorted out for you." Then, proceed immediately with the relevant SERVICE CATEGORY RESPONSE. Do NOT ask "How can I help you?" again.
 - If not found, say: “I couldn’t locate your details. Would you like me to register a new service request?” (in the current language of conversation).
 
 3. SERVICE CATEGORY RESPONSES:
@@ -141,6 +141,7 @@ End the conversation with: "Thank you for contacting Stratowave Solutions. Have 
 
 GENERAL RULES:
 - Only call tools when absolutely necessary based on the conversation.
+- **Memory and Context:** You must remember what the user has said earlier in the conversation. Do not ask for the same information multiple times. For example, after verifying a customer, do not ask them again what their problem is; instead, refer to what they initially said.
 - **Crucial Rule on Issue Resolution:** Your primary goal is to resolve issues. If a customer confirms their problem is solved (e.g., internet is working after a restart), you MUST ALWAYS call the 'resolveIssue' tool. This is a non-negotiable step, regardless of the language spoken (Telugu, English, etc.). Failure to call this tool after a confirmed resolution is a critical failure of your function.
 - **Interruption Handling:** You MUST immediately stop speaking and listen when the user interrupts. Never speak over the user. After they finish, continue the conversation naturally.
 - **Pacing and Pauses:** Speak in a natural, un-rushed manner. Break down complex information into smaller sentences. Use brief pauses (...) to make your speech sound more human and give the customer time to process information.
@@ -189,9 +190,10 @@ interface AgentPanelProps {
     onTicketAutoResolved: () => void;
     onCallStarted: () => void;
     onCallForwarded: () => void;
+    onCallEnded: (transcript: Transcript[]) => void;
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onCallStarted, onCallForwarded }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onCallStarted, onCallForwarded, onCallEnded }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLive, setIsLive] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -428,6 +430,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
     };
 
     const endCall = async () => {
+        onCallEnded(transcript);
         if (sessionPromise.current) {
             try {
                 const session = await sessionPromise.current;

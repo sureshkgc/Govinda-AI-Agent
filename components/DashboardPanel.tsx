@@ -423,6 +423,41 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                         <KpiCard title="Calls Forwarded" value={callStats.forwardedCalls} icon={<UserIcon className="w-6 h-6" />} color="indigo"/>
                     </div>
                 </div>
+                
+                {/* --- DEPARTMENT SLA SECTION --- */}
+                <div>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Department SLA</h3>
+                        <button 
+                            onClick={handleDownloadDepartmentSLA}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download CSV</span>
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {departmentStats.map(dept => (
+                            <div key={dept.name} className="text-sm p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 shadow-sm border border-slate-200 dark:border-slate-700">
+                               <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2 truncate" title={dept.name}>{dept.name}</h4>
+                               <div className="flex items-center justify-around gap-2 text-slate-600 dark:text-slate-300">
+                                    <div className="text-center">
+                                        <p className="font-bold text-xl text-slate-800 dark:text-slate-100">{dept.totalTickets}</p>
+                                        <p className="text-xs font-medium">Total</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="font-bold text-xl text-slate-800 dark:text-slate-100">{dept.resolvedTickets}</p>
+                                        <p className="text-xs font-medium">Resolved</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{formatResolutionDuration(dept.avgResolutionTime)}</p>
+                                        <p className="text-xs font-medium">Avg. Time</p>
+                                    </div>
+                               </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
                 {/* --- TICKETS TABLE SECTION --- */}
                 <div>
@@ -529,41 +564,6 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                             </table>
                         </div>
                     )}
-                </div>
-            </div>
-             <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-                 <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-md font-semibold flex items-center gap-2">
-                        <UserIcon className="w-5 h-5" /> Department SLA
-                    </h3>
-                    <button 
-                        onClick={handleDownloadDepartmentSLA}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition"
-                    >
-                        <DownloadIcon className="w-4 h-4" />
-                        <span>Download CSV</span>
-                    </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {departmentStats.map(dept => (
-                        <div key={dept.name} className="text-sm p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 shadow-sm border border-slate-200 dark:border-slate-700">
-                           <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2 truncate" title={dept.name}>{dept.name}</h4>
-                           <div className="flex items-center justify-around gap-2 text-slate-600 dark:text-slate-300">
-                                <div className="text-center">
-                                    <p className="font-bold text-xl text-slate-800 dark:text-slate-100">{dept.totalTickets}</p>
-                                    <p className="text-xs font-medium">Total</p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="font-bold text-xl text-slate-800 dark:text-slate-100">{dept.resolvedTickets}</p>
-                                    <p className="text-xs font-medium">Resolved</p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{formatResolutionDuration(dept.avgResolutionTime)}</p>
-                                    <p className="text-xs font-medium">Avg. Time</p>
-                                </div>
-                           </div>
-                        </div>
-                    ))}
                 </div>
             </div>
         </div>

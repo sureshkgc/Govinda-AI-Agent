@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
 import { BillingInfo, Ticket, Transcript, Technician } from '../types';
@@ -88,7 +87,7 @@ You must start the call and speak first. Greet the user in Telugu. For example: 
 2. CUSTOMER VERIFICATION:
 If the user asks a question that requires account details, first ask for verification: “May I have your Customer ID or registered mobile number, please?” (in the current language of conversation).
 - If a Customer ID from the knowledge base is provided, find the record and respond by incorporating their name and location. You MUST acknowledge the problem they already stated and move directly to troubleshooting. For example: "Thank you! I’ve located your account, {{customer_name}}, from {{Village}}. I see you are on the {{Package Name}} plan. I understand you're having issues with your internet. Let's get that sorted out for you." Then, proceed immediately with the relevant SERVICE CATEGORY RESPONSE. Do NOT ask "How can I help you?" again.
-- If not found, say: “I couldn’t locate your details. Would you like me to register a new service request?” (in the current language of conversation).
+- If not found, say: “I couldn’t locate your details. Would you like me to register a new service request?” (in the current language of conversation). If the user agrees, you MUST gather their full name, village, mandal, and district. Once you have this information, you MUST use the 'createNewConnectionRequest' tool.
 
 3. SERVICE CATEGORY RESPONSES:
 
@@ -175,6 +174,10 @@ const resolveIssue = (accountId: string, details: string): { status: string; res
     console.log(`SIMULATING auto-resolution for account ${accountId}: ${details}`);
     return { status: 'Issue marked as resolved by agent.', resolutionId: `RES-${Date.now()}` };
 };
+const createNewConnectionRequest = (customerName: string, village: string, mandal: string, district: string): { status: string; requestId: string } => {
+    console.log(`SIMULATING new connection request for ${customerName} in ${village}, ${mandal}, ${district}`);
+    return { status: 'New connection request created.', requestId: `NCR-${Date.now()}` };
+};
 
 const tools: FunctionDeclaration[] = [
     { name: 'getBilling', description: 'Get billing details.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
@@ -184,22 +187,25 @@ const tools: FunctionDeclaration[] = [
     { name: 'restartDevice', description: 'Remotely restarts the customer\'s device/modem.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
     { name: 'transferCallToManager', description: 'Transfers the call to a human manager for intervention.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
     { name: 'resolveIssue', description: 'Marks an issue as resolved by the agent without creating a technician ticket.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING }, details: { type: Type.STRING } }, required: ['accountId', 'details'] } },
+    { name: 'createNewConnectionRequest', description: 'Creates a request for a new internet connection for a new customer.', parameters: { type: Type.OBJECT, properties: { customerName: { type: Type.STRING, description: "Customer's full name" }, village: { type: Type.STRING }, mandal: { type: Type.STRING }, district: { type: Type.STRING } }, required: ['customerName', 'village', 'mandal', 'district'] } },
 ];
 
 interface AgentPanelProps {
     onTicketCreated: (ticket: Ticket) => void;
     onTicketAutoResolved: () => void;
+    onNewConnectionRequest: () => void;
     onCallStarted: () => void;
     onCallForwarded: () => void;
     onCallEnded: (transcript: Transcript[]) => void;
     technicians: Technician[];
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onCallStarted, onCallForwarded, onCallEnded, technicians }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onNewConnectionRequest, onCallStarted, onCallForwarded, onCallEnded, technicians }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLive, setIsLive] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [transcript, setTranscript] = useState<Transcript[]>([]);
+    const transcriptRef = useRef(transcript);
     const sessionPromise = useRef<Promise<LiveSession> | null>(null);
     const mediaStream = useRef<MediaStream | null>(null);
     const audioContext = useRef<AudioContext | null>(null);
@@ -207,13 +213,180 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
     const outputAudioContext = useRef<AudioContext | null>(null);
     const nextStartTime = useRef(0);
     const sources = useRef(new Set<AudioBufferSourceNode>());
-
     const transcriptEndRef = useRef<HTMLDivElement>(null);
+    const onMessageHandlerRef = useRef(async (message: LiveServerMessage) => {});
+
+    useEffect(() => {
+        transcriptRef.current = transcript;
+    }, [transcript]);
 
     useEffect(() => {
         transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [transcript]);
 
+    const cleanup = useCallback(() => {
+        setIsConnecting(false);
+        setIsLive(false);
+        if (scriptProcessor.current) {
+            scriptProcessor.current.disconnect();
+            scriptProcessor.current = null;
+        }
+        if (mediaStream.current) {
+            mediaStream.current.getTracks().forEach(track => track.stop());
+            mediaStream.current = null;
+        }
+        if (audioContext.current) {
+            audioContext.current.close();
+            audioContext.current = null;
+        }
+        if (outputAudioContext.current) {
+            outputAudioContext.current.close();
+            outputAudioContext.current = null;
+        }
+        sources.current.forEach(source => source.stop());
+        sources.current.clear();
+        nextStartTime.current = 0;
+        sessionPromise.current = null;
+    }, []);
+
+    const endCall = useCallback(async () => {
+        onCallEnded(transcriptRef.current);
+        if (sessionPromise.current) {
+            try {
+                const session = await sessionPromise.current;
+                session.close();
+            } catch (e) {
+                console.error("Error closing session", e);
+            }
+        }
+        cleanup();
+    }, [onCallEnded, cleanup]);
+
+    useEffect(() => {
+        onMessageHandlerRef.current = async (message: LiveServerMessage) => {
+            if (message.serverContent) {
+                // Handle interruption first to stop playback immediately
+                if (message.serverContent.interrupted) {
+                    console.log("Model speech interrupted by user.");
+                    sources.current.forEach(source => source.stop());
+                    sources.current.clear();
+                    nextStartTime.current = 0;
+                }
+
+                // Handle transcriptions
+                if (message.serverContent.inputTranscription) {
+                    const text = message.serverContent.inputTranscription.text;
+                    setTranscript(prev => {
+                        const last = prev[prev.length - 1];
+                        if (last?.speaker === 'user') {
+                            const newLast = { ...last, text: last.text + text };
+                            return [...prev.slice(0, -1), newLast];
+                        }
+                        return [...prev, { speaker: 'user', text }];
+                    });
+                }
+                if (message.serverContent.outputTranscription) {
+                    const text = message.serverContent.outputTranscription.text;
+                    setTranscript(prev => {
+                        const last = prev[prev.length - 1];
+                        if (last?.speaker === 'model') {
+                            const newLast = { ...last, text: last.text + text };
+                            return [...prev.slice(0, -1), newLast];
+                        }
+                        return [...prev, { speaker: 'model', text }];
+                    });
+                }
+                if (message.serverContent.turnComplete) {
+                    setTranscript(prev => prev.map(t => ({...t})));
+                }
+
+                // Handle audio playback
+                const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+                if (audioData && outputAudioContext.current) {
+                    const outCtx = outputAudioContext.current;
+                    nextStartTime.current = Math.max(nextStartTime.current, outCtx.currentTime);
+                    const audioBuffer = await decodeAudioData(decode(audioData), outCtx, 24000, 1);
+                    const source = outCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(outCtx.destination);
+                    source.addEventListener('ended', () => { sources.current.delete(source); });
+                    source.start(nextStartTime.current);
+                    nextStartTime.current += audioBuffer.duration;
+                    sources.current.add(source);
+                }
+            }
+            
+            // Handle tool calls
+            if (message.toolCall?.functionCalls) {
+                for (const fc of message.toolCall.functionCalls) {
+                    try {
+                        let toolResult;
+                        if (fc.name === 'getBilling') {
+                            toolResult = getBilling(fc.args.accountId);
+                        } else if (fc.name === 'createTicket') {
+                            const ticketId = `TCK-${Math.floor(10000 + Math.random() * 90000)}`;
+                            
+                            const category = fc.args.category;
+                            const availableTechnicians = technicians.filter(t => 
+                                t.skills.includes(category) || t.skills.includes(category.split(' ')[0])
+                            );
+                            const assignedTechnician = availableTechnicians.length > 0
+                                ? availableTechnicians[Math.floor(Math.random() * availableTechnicians.length)]
+                                : technicians[Math.floor(Math.random() * technicians.length)];
+
+                            toolResult = {
+                                ticketId: ticketId,
+                                priority: 'Normal',
+                                eta: '2 hours',
+                                technicianName: assignedTechnician.name,
+                            };
+                            
+                            const newTicket: Ticket = {
+                                id: ticketId,
+                                customerId: fc.args.accountId,
+                                customerName: fc.args.customerName,
+                                category: fc.args.category,
+                                details: fc.args.details,
+                                status: 'Assigned',
+                                assignedTo: assignedTechnician.id,
+                            };
+
+                            onTicketCreated(newTicket);
+                        } else if (fc.name === 'sendSms') {
+                             toolResult = sendSms(fc.args.accountId, fc.args.message);
+                        } else if (fc.name === 'getDeviceDetails') {
+                            toolResult = getDeviceDetails(fc.args.accountId);
+                        } else if (fc.name === 'restartDevice') {
+                            toolResult = restartDevice(fc.args.accountId);
+                        } else if (fc.name === 'transferCallToManager') {
+                            toolResult = transferCallToManager(fc.args.accountId);
+                            onCallForwarded();
+                            setTranscript(prev => [...prev, { speaker: 'system', text: `Call is being transferred to a human manager...` }]);
+                            setTimeout(() => endCall(), 1000); 
+                        } else if (fc.name === 'resolveIssue') {
+                            toolResult = resolveIssue(fc.args.accountId, fc.args.details);
+                            onTicketAutoResolved();
+                        } else if (fc.name === 'createNewConnectionRequest') {
+                            toolResult = createNewConnectionRequest(fc.args.customerName, fc.args.village, fc.args.mandal, fc.args.district);
+                            onNewConnectionRequest();
+                        } else {
+                            throw new Error(`Unknown function: ${fc.name}`);
+                        }
+
+                        if (sessionPromise.current) {
+                            const session = await sessionPromise.current;
+                            session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(toolResult) } }});
+                        }
+                    } catch (e: any) {
+                        if (sessionPromise.current) {
+                            const session = await sessionPromise.current;
+                            session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { error: e.message } } });
+                        }
+                    }
+                }
+            }
+        };
+    }, [onTicketCreated, onTicketAutoResolved, onNewConnectionRequest, onCallForwarded, technicians, endCall]);
 
     const startCall = async () => {
         setIsConnecting(true);
@@ -277,7 +450,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                         scriptProcessor.current.connect(audioContext.current.destination);
                     },
                     onmessage: async (message: LiveServerMessage) => {
-                        handleServerMessage(message);
+                        onMessageHandlerRef.current(message);
                     },
                     onclose: () => {
                         console.log('Session closed.');
@@ -298,167 +471,6 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
         }
     };
     
-    const handleServerMessage = useCallback(async (message: LiveServerMessage) => {
-        if (message.serverContent) {
-            // Handle interruption first to stop playback immediately
-            if (message.serverContent.interrupted) {
-                console.log("Model speech interrupted by user.");
-                sources.current.forEach(source => source.stop());
-                sources.current.clear();
-                nextStartTime.current = 0;
-            }
-
-            // Handle transcriptions
-            if (message.serverContent.inputTranscription) {
-                const text = message.serverContent.inputTranscription.text;
-                setTranscript(prev => {
-                    const last = prev[prev.length - 1];
-                    if (last?.speaker === 'user') {
-                        const newLast = { ...last, text: last.text + text };
-                        return [...prev.slice(0, -1), newLast];
-                    }
-                    return [...prev, { speaker: 'user', text }];
-                });
-            }
-            if (message.serverContent.outputTranscription) {
-                const text = message.serverContent.outputTranscription.text;
-                setTranscript(prev => {
-                    const last = prev[prev.length - 1];
-                    if (last?.speaker === 'model') {
-                        const newLast = { ...last, text: last.text + text };
-                        return [...prev.slice(0, -1), newLast];
-                    }
-                    return [...prev, { speaker: 'model', text }];
-                });
-            }
-            if (message.serverContent.turnComplete) {
-                setTranscript(prev => prev.map(t => ({...t})));
-            }
-
-            // Handle audio playback
-            const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-            if (audioData && outputAudioContext.current) {
-                const outCtx = outputAudioContext.current;
-                nextStartTime.current = Math.max(nextStartTime.current, outCtx.currentTime);
-                const audioBuffer = await decodeAudioData(decode(audioData), outCtx, 24000, 1);
-                const source = outCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(outCtx.destination);
-                source.addEventListener('ended', () => { sources.current.delete(source); });
-                source.start(nextStartTime.current);
-                nextStartTime.current += audioBuffer.duration;
-                sources.current.add(source);
-            }
-        }
-        
-        // Handle tool calls
-        if (message.toolCall?.functionCalls) {
-            for (const fc of message.toolCall.functionCalls) {
-                try {
-                    let toolResult;
-                    if (fc.name === 'getBilling') {
-                        toolResult = getBilling(fc.args.accountId);
-                    } else if (fc.name === 'createTicket') {
-                        const ticketId = `TCK-${Math.floor(10000 + Math.random() * 90000)}`;
-                        
-                        const category = fc.args.category;
-                        const availableTechnicians = technicians.filter(t => 
-                            t.skills.includes(category) || t.skills.includes(category.split(' ')[0])
-                        );
-                        const assignedTechnician = availableTechnicians.length > 0
-                            ? availableTechnicians[Math.floor(Math.random() * availableTechnicians.length)]
-                            : technicians[Math.floor(Math.random() * technicians.length)];
-
-                        toolResult = {
-                            ticketId: ticketId,
-                            priority: 'Normal',
-                            eta: '2 hours',
-                            technicianName: assignedTechnician.name,
-                        };
-                        
-                        const newTicket: Ticket = {
-                            id: ticketId,
-                            customerId: fc.args.accountId,
-                            customerName: fc.args.customerName,
-                            category: fc.args.category,
-                            details: fc.args.details,
-                            status: 'Assigned',
-                            assignedTo: assignedTechnician.id,
-                        };
-
-                        onTicketCreated(newTicket);
-                    } else if (fc.name === 'sendSms') {
-                         toolResult = sendSms(fc.args.accountId, fc.args.message);
-                    } else if (fc.name === 'getDeviceDetails') {
-                        toolResult = getDeviceDetails(fc.args.accountId);
-                    } else if (fc.name === 'restartDevice') {
-                        toolResult = restartDevice(fc.args.accountId);
-                    } else if (fc.name === 'transferCallToManager') {
-                        toolResult = transferCallToManager(fc.args.accountId);
-                        onCallForwarded();
-                        setTranscript(prev => [...prev, { speaker: 'system', text: `Call is being transferred to a human manager...` }]);
-                        setTimeout(() => endCall(), 1000); 
-                    } else if (fc.name === 'resolveIssue') {
-                        toolResult = resolveIssue(fc.args.accountId, fc.args.details);
-                        onTicketAutoResolved();
-                    } else {
-                        throw new Error(`Unknown function: ${fc.name}`);
-                    }
-
-                    if (sessionPromise.current) {
-                        const session = await sessionPromise.current;
-                        session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(toolResult) } }});
-                    }
-                } catch (e: any) {
-                    if (sessionPromise.current) {
-                        const session = await sessionPromise.current;
-                        session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { error: e.message } } });
-                    }
-                }
-            }
-        }
-
-    }, [onTicketCreated, onTicketAutoResolved, onCallForwarded, technicians]);
-
-
-    const cleanup = () => {
-        setIsConnecting(false);
-        setIsLive(false);
-        if (scriptProcessor.current) {
-            scriptProcessor.current.disconnect();
-            scriptProcessor.current = null;
-        }
-        if (mediaStream.current) {
-            mediaStream.current.getTracks().forEach(track => track.stop());
-            mediaStream.current = null;
-        }
-        if (audioContext.current) {
-            audioContext.current.close();
-            audioContext.current = null;
-        }
-        if (outputAudioContext.current) {
-            outputAudioContext.current.close();
-            outputAudioContext.current = null;
-        }
-        sources.current.forEach(source => source.stop());
-        sources.current.clear();
-        nextStartTime.current = 0;
-        sessionPromise.current = null;
-    };
-
-    const endCall = async () => {
-        onCallEnded(transcript);
-        if (sessionPromise.current) {
-            try {
-                const session = await sessionPromise.current;
-                session.close();
-            } catch (e) {
-                console.error("Error closing session", e);
-            }
-        }
-        cleanup();
-    };
-
     return (
         <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-lg shadow-lg flex flex-col h-full">
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">

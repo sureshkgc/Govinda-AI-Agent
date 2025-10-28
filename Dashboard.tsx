@@ -15,6 +15,7 @@ const Dashboard: React.FC = () => {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [technicians] = useState<Technician[]>(initialTechnicians);
     const [autoResolvedCount, setAutoResolvedCount] = useState(0);
+    const [newConnectionRequests, setNewConnectionRequests] = useState(0);
     const [calls, setCalls] = useState<Call[]>([]);
     const [activeCallId, setActiveCallId] = useState<string | null>(null);
     const [callStats, setCallStats] = useState<CallStats>({
@@ -46,6 +47,13 @@ const Dashboard: React.FC = () => {
         setAutoResolvedCount(prev => prev + 1);
         console.log(`--- NOTIFICATION ---`);
         console.log(`An issue was resolved automatically by the AI agent.`);
+        console.log(`--------------------`);
+    }, []);
+
+    const handleNewConnectionRequest = useCallback(() => {
+        setNewConnectionRequests(prev => prev + 1);
+        console.log(`--- NOTIFICATION ---`);
+        console.log(`A new connection request was registered by the AI agent.`);
         console.log(`--------------------`);
     }, []);
 
@@ -94,6 +102,7 @@ const Dashboard: React.FC = () => {
                     <AgentPanel 
                         onTicketCreated={handleTicketCreated} 
                         onTicketAutoResolved={handleTicketAutoResolved}
+                        onNewConnectionRequest={handleNewConnectionRequest}
                         onCallStarted={handleCallStarted}
                         onCallForwarded={handleCallForwarded}
                         onCallEnded={handleCallEnded}
@@ -105,6 +114,7 @@ const Dashboard: React.FC = () => {
                         tickets={tickets} 
                         technicians={technicians} 
                         autoResolvedCount={autoResolvedCount} 
+                        newConnectionRequests={newConnectionRequests}
                         callStats={callStats} 
                         calls={calls}
                     />

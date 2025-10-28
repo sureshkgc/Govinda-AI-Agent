@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Ticket, Technician, CallStats, Call } from '../types';
 import { 
@@ -10,13 +11,15 @@ import {
     PhoneIcon,
     PhoneArrowDownLeftIcon,
     PhoneXMarkIcon,
-    DownloadIcon
+    DownloadIcon,
+    UserPlusIcon
 } from './icons';
 
 interface DashboardPanelProps {
     tickets: Ticket[];
     technicians: Technician[];
     autoResolvedCount: number;
+    newConnectionRequests: number;
     callStats: CallStats;
     calls: Call[];
 }
@@ -131,7 +134,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color }) => {
 };
 
 
-const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, autoResolvedCount, callStats, calls }) => {
+const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, autoResolvedCount, newConnectionRequests, callStats, calls }) => {
     const getTechnicianName = (id?: string) => {
         if (!id) return 'Unassigned';
         return technicians.find(t => t.id === id)?.name || 'Unknown';
@@ -277,11 +280,12 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                 {/* --- KPI CARDS --- */}
                 <div>
                      <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Key Metrics</h3>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                          <KpiCard title="Total Tickets" value={analytics.total} icon={<ClipboardDocumentListIcon className="w-6 h-6" />} color="blue"/>
                          <KpiCard title="Open Tickets" value={analytics.open} icon={<ClockIcon className="w-6 h-6" />} color="yellow" />
                          <KpiCard title="Resolved Tickets" value={analytics.resolved} icon={<CheckCircleIcon className="w-6 h-6" />} color="green" />
                          <KpiCard title="Auto Resolved" value={autoResolvedCount} icon={<SparklesIcon className="w-6 h-6" />} color="purple"/>
+                         <KpiCard title="New Requests" value={newConnectionRequests} icon={<UserPlusIcon className="w-6 h-6" />} color="indigo"/>
                      </div>
                 </div>
 

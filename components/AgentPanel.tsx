@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from '@google/genai';
-import { BillingInfo, Ticket, Transcript, Technician } from '../types';
+import { BillingInfo, Ticket, Transcript, Technician, Department } from '../types';
 import { BotIcon, MicrophoneIcon, PhoneSlashIcon } from './icons';
 import TranscriptEntry from './TranscriptEntry';
 
@@ -145,7 +145,7 @@ GENERAL RULES:
 - **Crucial Rule on Issue Resolution:** Your primary goal is to resolve issues. If a customer confirms their problem is solved (e.g., internet is working after a restart), you MUST ALWAYS call the 'resolveIssue' tool. This is a non-negotiable step, regardless of the language spoken (Telugu, English, etc.). Failure to call this tool after a confirmed resolution is a critical failure of your function.
 - **Interruption Handling:** You MUST immediately stop speaking and listen when the user interrupts. Never speak over the user. After they finish, continue the conversation naturally.
 - **Pacing and Pauses:** Speak in a natural, un-rushed manner. Break down complex information into smaller sentences. Use brief pauses (...) to make your speech sound more human and give the customer time to process information.
-- **Proactive Engagement:** Be attentive. If you ask a question and the user doesn't respond for a few seconds, gently prompt them. For example, you can say "Are you still there?" or "Just wanted to make sure we're still connected." This shows you are actively listening.
+- **Proactive Engagement:** Be attentive. If you ask a question and the user doesn't respond for a few seconds, gently prompt them. For example, you can say, "Are you still there?" or "Just wanted to make sure we're still connected." This shows you are actively listening.
 - **Reminder:** Always adhere to the Persona Directive and speak in the user's detected language.
 `;
 
@@ -171,8 +171,8 @@ const transferCallToManager = (accountId: string): { status: string; transferId:
     return { status: 'Transfer initiated.', transferId: `TR-${Date.now()}` };
 };
 const resolveIssue = (accountId: string, details: string): { status: string; resolutionId: string } => {
-    console.log(`SIMULATING auto-resolution for account ${accountId}: ${details}`);
-    return { status: 'Issue marked as resolved by agent.', resolutionId: `RES-${Date.now()}` };
+    console.log(`SIMULATING resolution for account ${accountId}: ${details}`);
+    return { status: 'Issue marked as resolved based on user confirmation.', resolutionId: `RES-${Date.now()}` };
 };
 const createNewConnectionRequest = (customerName: string, village: string, mandal: string, district: string): { status: string; requestId: string } => {
     console.log(`SIMULATING new connection request for ${customerName} in ${village}, ${mandal}, ${district}`);
@@ -186,13 +186,13 @@ const tools: FunctionDeclaration[] = [
     { name: 'getDeviceDetails', description: 'Get technical details about the customer\'s device/modem.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
     { name: 'restartDevice', description: 'Remotely restarts the customer\'s device/modem.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
     { name: 'transferCallToManager', description: 'Transfers the call to a human manager for intervention.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING } }, required: ['accountId'] } },
-    { name: 'resolveIssue', description: 'Marks an issue as resolved by the agent without creating a technician ticket.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING }, details: { type: Type.STRING } }, required: ['accountId', 'details'] } },
+    { name: 'resolveIssue', description: 'Marks an issue as resolved by the agent, often after customer confirmation. This may resolve an existing ticket or prevent one from being created.', parameters: { type: Type.OBJECT, properties: { accountId: { type: Type.STRING }, details: { type: Type.STRING } }, required: ['accountId', 'details'] } },
     { name: 'createNewConnectionRequest', description: 'Creates a request for a new internet connection for a new customer.', parameters: { type: Type.OBJECT, properties: { customerName: { type: Type.STRING, description: "Customer's full name" }, village: { type: Type.STRING }, mandal: { type: Type.STRING }, district: { type: Type.STRING } }, required: ['customerName', 'village', 'mandal', 'district'] } },
 ];
 
 interface AgentPanelProps {
     onTicketCreated: (ticket: Ticket) => void;
-    onTicketAutoResolved: () => void;
+    onTicketResolved: (accountId: string) => void;
     onNewConnectionRequest: () => void;
     onCallStarted: () => void;
     onCallForwarded: () => void;
@@ -200,7 +200,7 @@ interface AgentPanelProps {
     technicians: Technician[];
 }
 
-const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoResolved, onNewConnectionRequest, onCallStarted, onCallForwarded, onCallEnded, technicians }) => {
+const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketResolved, onNewConnectionRequest, onCallStarted, onCallForwarded, onCallEnded, technicians }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isLive, setIsLive] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -340,6 +340,18 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                                 eta: '2 hours',
                                 technicianName: assignedTechnician.name,
                             };
+
+                            let department: Department;
+                            switch (category.toLowerCase()) {
+                                case 'billing':
+                                    department = 'Business Operations';
+                                    break;
+                                case 'internet':
+                                case 'iptv':
+                                default:
+                                    department = 'Technology Operations';
+                                    break;
+                            }
                             
                             const newTicket: Ticket = {
                                 id: ticketId,
@@ -349,6 +361,8 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                                 details: fc.args.details,
                                 status: 'Assigned',
                                 assignedTo: assignedTechnician.id,
+                                department: department,
+                                assignedTime: new Date(),
                             };
 
                             onTicketCreated(newTicket);
@@ -365,7 +379,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                             setTimeout(() => endCall(), 1000); 
                         } else if (fc.name === 'resolveIssue') {
                             toolResult = resolveIssue(fc.args.accountId, fc.args.details);
-                            onTicketAutoResolved();
+                            onTicketResolved(fc.args.accountId);
                         } else if (fc.name === 'createNewConnectionRequest') {
                             toolResult = createNewConnectionRequest(fc.args.customerName, fc.args.village, fc.args.mandal, fc.args.district);
                             onNewConnectionRequest();
@@ -386,7 +400,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ onTicketCreated, onTicketAutoRe
                 }
             }
         };
-    }, [onTicketCreated, onTicketAutoResolved, onNewConnectionRequest, onCallForwarded, technicians, endCall]);
+    }, [onTicketCreated, onTicketResolved, onNewConnectionRequest, onCallForwarded, technicians, endCall]);
 
     const startCall = async () => {
         setIsConnecting(true);

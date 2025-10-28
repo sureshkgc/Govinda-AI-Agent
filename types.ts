@@ -1,4 +1,8 @@
 
+
+export type Department = 'Business Operations' | 'Enterprise Sales' | 'Technology Operations' | 'NOC Operations' | 'Admin & HR';
+export const departments: Department[] = ['Business Operations', 'Enterprise Sales', 'Technology Operations', 'NOC Operations', 'Admin & HR'];
+
 export interface BillingInfo {
   balance: number;
   lastInvoiceAmount: number;
@@ -33,6 +37,9 @@ export interface Ticket {
   details: string;
   status: 'New' | 'Assigned' | 'In Progress' | 'Resolved';
   assignedTo?: string; // Technician ID
+  department: Department;
+  assignedTime: Date;
+  resolvedTime?: Date;
 }
 
 export interface Transcript {

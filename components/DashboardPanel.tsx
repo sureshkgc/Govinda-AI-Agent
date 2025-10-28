@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Ticket, Technician, CallStats, Call } from '../types';
+import { Ticket, Technician, CallStats, Call, departments } from '../types';
 import { 
     TicketIcon, 
     UserIcon, 
@@ -107,7 +107,7 @@ const PieChart: React.FC<PieChartProps> = ({ data, title }) => {
 // --- KPI CARD COMPONENT ---
 interface KpiCardProps {
     title: string;
-    value: number;
+    value: number | string;
     icon: React.ReactNode;
     color: 'blue' | 'green' | 'yellow' | 'purple' | 'red' | 'indigo';
 }
@@ -161,6 +161,24 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
         const seconds = totalSeconds % 60;
         return `${minutes}m ${seconds}s`;
     };
+
+    const formatResolutionDuration = (milliseconds: number): string => {
+        if (milliseconds <= 0) return '-';
+
+        let seconds = Math.floor(milliseconds / 1000);
+        let minutes = Math.floor(seconds / 60);
+        let hours = Math.floor(minutes / 60);
+
+        seconds = seconds % 60;
+        minutes = minutes % 60;
+
+        const parts: string[] = [];
+        if (hours > 0) parts.push(`${hours}h`);
+        if (minutes > 0) parts.push(`${minutes}m`);
+        if (hours === 0 && minutes < 30 && seconds > 0) parts.push(`${seconds}s`); // show seconds for short durations
+        
+        return parts.length > 0 ? parts.join(' ') : '< 1m';
+    };
     
     const analytics = useMemo(() => {
         const ticketsByCategory = tickets.reduce((acc, ticket) => {
@@ -206,24 +224,43 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
         return { totalMinutes };
     }, [calls]);
 
-    const ticketsByTechId = useMemo(() => {
-        return tickets.reduce((acc, ticket) => {
-            if (ticket.assignedTo) {
-                acc[ticket.assignedTo] = (acc[ticket.assignedTo] || 0) + 1;
+    const departmentStats = useMemo(() => {
+        const stats: { [key: string]: { totalTickets: number; resolvedTickets: number; totalResolutionTime: number } } = {};
+        
+        departments.forEach(dept => {
+            stats[dept] = { totalTickets: 0, resolvedTickets: 0, totalResolutionTime: 0 };
+        });
+
+        tickets.forEach(ticket => {
+            if (!stats[ticket.department]) return;
+
+            stats[ticket.department].totalTickets++;
+            if (ticket.status === 'Resolved' && ticket.resolvedTime) {
+                stats[ticket.department].resolvedTickets++;
+                const resolutionTime = ticket.resolvedTime.getTime() - ticket.assignedTime.getTime();
+                if (resolutionTime > 0) {
+                    stats[ticket.department].totalResolutionTime += resolutionTime;
+                }
             }
-            return acc;
-        }, {} as {[key: string]: number});
+        });
+
+        return Object.entries(stats).map(([name, data]) => {
+            const avgResolutionTime = data.resolvedTickets > 0 ? data.totalResolutionTime / data.resolvedTickets : 0;
+            return {
+                name,
+                ...data,
+                avgResolutionTime,
+            };
+        });
     }, [tickets]);
+    
 
-    const downloadCSV = (data: any[], filename: string) => {
-        if (data.length === 0) return;
-
-        const headers = Object.keys(data[0]);
+    const downloadCSV = (data: any[], filename: string, headers: string[]) => {
         const csvRows = [
             headers.join(','), // header row
             ...data.map(row => 
                 headers.map(fieldName => 
-                    JSON.stringify(row[fieldName], (key, value) => value === null ? '' : value)
+                    JSON.stringify(row[fieldName] ?? '', (key, value) => value === null ? '' : value)
                 ).join(',')
             )
         ];
@@ -243,7 +280,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
     };
 
     const handleDownloadTickets = () => {
-        if (tickets.length === 0) return;
+        const headers = ['ticketId', 'customerId', 'customerName', 'category', 'details', 'status', 'assignedTo', 'department', 'assignedTime', 'resolvedTime'];
         const dataToExport = tickets.map(t => ({
             ticketId: t.id,
             customerId: t.customerId,
@@ -252,12 +289,15 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
             details: t.details,
             status: t.status,
             assignedTo: getTechnicianName(t.assignedTo),
+            department: t.department,
+            assignedTime: t.assignedTime.toISOString(),
+            resolvedTime: t.resolvedTime?.toISOString() || 'N/A',
         }));
-        downloadCSV(dataToExport, 'tickets.csv');
+        downloadCSV(dataToExport, 'tickets.csv', headers);
     };
 
     const handleDownloadCalls = () => {
-        if (calls.length === 0) return;
+        const headers = ['callId', 'startTime', 'endTime', 'duration', 'status', 'transcript'];
         const dataToExport = calls.map(c => ({
             callId: c.id,
             startTime: c.startTime.toISOString(),
@@ -266,7 +306,53 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
             status: c.status,
             transcript: c.transcript.map(t => `[${t.speaker}] ${t.text}`).join(' | '),
         }));
-        downloadCSV(dataToExport, 'calls.csv');
+        downloadCSV(dataToExport, 'calls.csv', headers);
+    };
+
+    const handleDownloadKeyMetrics = () => {
+        const headers = ['metric', 'value'];
+        const dataToExport = [
+            { metric: 'Total Tickets', value: analytics.total },
+            { metric: 'Open Tickets', value: analytics.open },
+            { metric: 'Resolved Tickets', value: analytics.resolved },
+            { metric: 'AI Pre-Ticket Resolutions', value: autoResolvedCount },
+            { metric: 'New Connection Requests', value: newConnectionRequests },
+        ];
+        downloadCSV(dataToExport, 'key_metrics.csv', headers);
+    };
+
+    const handleDownloadAnalyticsBreakdown = () => {
+        const headers = ['analysis_type', 'item', 'value'];
+        const dataToExport = [
+            ...Object.entries(analytics.byCategory).map(([category, value]) => ({ analysis_type: 'Tickets by Category', item: category, value })),
+            ...Object.entries(analytics.byStatus).map(([status, value]) => ({ analysis_type: 'Tickets by Status', item: status, value })),
+            ...Object.entries(analytics.byTechnician).map(([technician, value]) => ({ analysis_type: 'Tickets by Technician', item: technician, value })),
+        ];
+        downloadCSV(dataToExport, 'analytics_breakdown.csv', headers);
+    };
+
+    const handleDownloadCallCenterAnalytics = () => {
+        const headers = ['metric', 'value'];
+        const dataToExport = [
+            { metric: 'Total Calls', value: callStats.totalCalls },
+            { metric: 'Calls Attended', value: callStats.attendedCalls },
+            { metric: 'Total Call Minutes', value: callAnalytics.totalMinutes },
+            { metric: 'Calls Missed', value: callStats.missedCalls },
+            { metric: 'Calls Forwarded', value: callStats.forwardedCalls },
+        ];
+        downloadCSV(dataToExport, 'call_center_analytics.csv', headers);
+    };
+
+    const handleDownloadDepartmentSLA = () => {
+        const headers = ['department', 'totalTickets', 'resolvedTickets', 'avgResolutionTime', 'avgResolutionTimeHours'];
+        const dataToExport = departmentStats.map(stat => ({
+            department: stat.name,
+            totalTickets: stat.totalTickets,
+            resolvedTickets: stat.resolvedTickets,
+            avgResolutionTime: formatResolutionDuration(stat.avgResolutionTime),
+            avgResolutionTimeHours: (stat.avgResolutionTime / (1000 * 60 * 60)).toFixed(2),
+        }));
+        downloadCSV(dataToExport, 'department_sla_report.csv', headers);
     };
 
 
@@ -279,7 +365,16 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {/* --- KPI CARDS --- */}
                 <div>
-                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Key Metrics</h3>
+                     <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Key Metrics</h3>
+                        <button 
+                            onClick={handleDownloadKeyMetrics}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download CSV</span>
+                        </button>
+                    </div>
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                          <KpiCard title="Total Tickets" value={analytics.total} icon={<ClipboardDocumentListIcon className="w-6 h-6" />} color="blue"/>
                          <KpiCard title="Open Tickets" value={analytics.open} icon={<ClockIcon className="w-6 h-6" />} color="yellow" />
@@ -291,7 +386,16 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
 
                 {/* --- CHARTS --- */}
                 <div>
-                     <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Analytics Breakdown</h3>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Analytics Breakdown</h3>
+                        <button 
+                            onClick={handleDownloadAnalyticsBreakdown}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download CSV</span>
+                        </button>
+                    </div>
                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <PieChart title="Tickets by Category" data={analytics.byCategory} />
                         <PieChart title="Tickets by Status" data={analytics.byStatus} />
@@ -301,7 +405,16 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
 
                 {/* --- CALL CENTER ANALYTICS SECTION --- */}
                 <div>
-                    <h3 className="text-lg font-semibold mb-3 text-slate-800 dark:text-slate-200">Call Center Analytics</h3>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Call Center Analytics</h3>
+                        <button 
+                            onClick={handleDownloadCallCenterAnalytics}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download CSV</span>
+                        </button>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <KpiCard title="Total Calls" value={callStats.totalCalls} icon={<PhoneIcon className="w-6 h-6" />} color="blue"/>
                         <KpiCard title="Calls Attended" value={callStats.attendedCalls} icon={<PhoneArrowDownLeftIcon className="w-6 h-6" />} color="green" />
@@ -317,7 +430,6 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Live Tickets</h3>
                         <button 
                             onClick={handleDownloadTickets}
-                            disabled={tickets.length === 0}
                             className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <DownloadIcon className="w-4 h-4" />
@@ -369,7 +481,6 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Call Log</h3>
                          <button 
                             onClick={handleDownloadCalls}
-                            disabled={calls.length === 0}
                             className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <DownloadIcon className="w-4 h-4" />
@@ -421,14 +532,37 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                 </div>
             </div>
              <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-                <h3 className="text-md font-semibold mb-2 flex items-center gap-2">
-                    <UserIcon className="w-5 h-5" /> Technician Workload
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                    {technicians.map(tech => (
-                        <span key={tech.id} className="px-3 py-1 text-xs font-medium rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                           {tech.name} ({ticketsByTechId[tech.id] || 0})
-                        </span>
+                 <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-md font-semibold flex items-center gap-2">
+                        <UserIcon className="w-5 h-5" /> Department SLA
+                    </h3>
+                    <button 
+                        onClick={handleDownloadDepartmentSLA}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white/80 dark:bg-slate-700/80 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600/80 transition"
+                    >
+                        <DownloadIcon className="w-4 h-4" />
+                        <span>Download CSV</span>
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {departmentStats.map(dept => (
+                        <div key={dept.name} className="text-sm p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 shadow-sm border border-slate-200 dark:border-slate-700">
+                           <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2 truncate" title={dept.name}>{dept.name}</h4>
+                           <div className="flex items-center justify-around gap-2 text-slate-600 dark:text-slate-300">
+                                <div className="text-center">
+                                    <p className="font-bold text-xl text-slate-800 dark:text-slate-100">{dept.totalTickets}</p>
+                                    <p className="text-xs font-medium">Total</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="font-bold text-xl text-slate-800 dark:text-slate-100">{dept.resolvedTickets}</p>
+                                    <p className="text-xs font-medium">Resolved</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{formatResolutionDuration(dept.avgResolutionTime)}</p>
+                                    <p className="text-xs font-medium">Avg. Time</p>
+                                </div>
+                           </div>
+                        </div>
                     ))}
                 </div>
             </div>

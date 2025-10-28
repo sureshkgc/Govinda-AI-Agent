@@ -43,11 +43,34 @@ const Dashboard: React.FC = () => {
         });
     }, [technicians]);
 
-    const handleTicketAutoResolved = useCallback(() => {
-        setAutoResolvedCount(prev => prev + 1);
-        console.log(`--- NOTIFICATION ---`);
-        console.log(`An issue was resolved automatically by the AI agent.`);
-        console.log(`--------------------`);
+    const handleTicketResolved = useCallback((customerId: string) => {
+        setTickets(prevTickets => {
+            const ticketIndex = prevTickets.findLastIndex(
+                t => t.customerId === customerId && t.status !== 'Resolved'
+            );
+
+            if (ticketIndex !== -1) {
+                console.log(`--- NOTIFICATION ---`);
+                console.log(`Ticket ${prevTickets[ticketIndex].id} has been resolved based on customer confirmation.`);
+                console.log(`--------------------`);
+                
+                const newTickets = [...prevTickets];
+                newTickets[ticketIndex] = {
+                    ...newTickets[ticketIndex],
+                    status: 'Resolved',
+                    resolvedTime: new Date(),
+                };
+                return newTickets;
+            } else {
+                 // If no open ticket was found for the customer, it means the issue was resolved
+                // by the AI before a ticket was even created.
+                setAutoResolvedCount(prev => prev + 1);
+                console.log(`--- NOTIFICATION ---`);
+                console.log(`An issue for customer ${customerId} was resolved automatically by the AI agent without creating a ticket.`);
+                console.log(`--------------------`);
+            }
+            return prevTickets;
+        });
     }, []);
 
     const handleNewConnectionRequest = useCallback(() => {
@@ -101,7 +124,7 @@ const Dashboard: React.FC = () => {
                 <div className="lg:w-1/2 xl:w-1/3 flex flex-col h-full">
                     <AgentPanel 
                         onTicketCreated={handleTicketCreated} 
-                        onTicketAutoResolved={handleTicketAutoResolved}
+                        onTicketResolved={handleTicketResolved}
                         onNewConnectionRequest={handleNewConnectionRequest}
                         onCallStarted={handleCallStarted}
                         onCallForwarded={handleCallForwarded}

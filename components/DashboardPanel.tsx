@@ -285,7 +285,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ tickets, technicians, a
                          <KpiCard title="Open Tickets" value={analytics.open} icon={<ClockIcon className="w-6 h-6" />} color="yellow" />
                          <KpiCard title="Resolved Tickets" value={analytics.resolved} icon={<CheckCircleIcon className="w-6 h-6" />} color="green" />
                          <KpiCard title="Auto Resolved" value={autoResolvedCount} icon={<SparklesIcon className="w-6 h-6" />} color="purple"/>
-                         <KpiCard title="New Requests" value={newConnectionRequests} icon={<UserPlusIcon className="w-6 h-6" />} color="indigo"/>
+                         <KpiCard title="New Connection Requests" value={newConnectionRequests} icon={<UserPlusIcon className="w-6 h-6" />} color="indigo"/>
                      </div>
                 </div>
 

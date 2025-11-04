@@ -118,7 +118,7 @@ const Dashboard: React.FC = () => {
     return (
         <div className="flex flex-col h-screen bg-gradient-to-br from-sky-100 to-indigo-200 dark:from-slate-900 dark:to-slate-800 font-sans text-slate-800 dark:text-slate-200">
             <header className="flex-shrink-0 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 shadow-sm p-4">
-                <h1 className="text-xl font-bold text-center">Bharat Sanchar Nigam Limited - Agent Dashboard</h1>
+                <h1 className="text-xl font-bold text-center">BSNL - Agent Dashboard</h1>
             </header>
             <main className="flex-1 flex flex-col lg:flex-row gap-6 p-6 overflow-hidden">
                 <div className="lg:w-1/2 xl:w-1/3 flex flex-col h-full">

@@ -1,6 +1,6 @@
 {
-  "name": "Bharat Sanchar Nigam Limited AI Assistant",
-  "description": "A conversational AI assistant, 'Sushma', for Bharat Sanchar Nigam Limited. It handles internet, IPTV, and billing issues, using a detailed knowledge base for personalized customer interactions.",
+  "name": "BSNL AI Assistant",
+  "description": "A conversational AI assistant, 'Sushma', for BSNL. It handles internet, IPTV, and billing issues, using a detailed knowledge base for personalized customer interactions.",
   "requestFramePermissions": [
     "microphone"
   ]
